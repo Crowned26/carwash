@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WashTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=10">
+    <script src="{{ url_for('static', filename='js/lang.js') }}?v=5"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo" id="app-logo">WashTrack</div>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link active">Ana Panel</a>
+                <a href="{{ url_for('receivables_page') }}" class="nav-link">Alacaklar</a>
+                <a href="{{ url_for('plate_history_page') }}" class="nav-link">Plaka Geçmişi</a>
+                <a href="{{ url_for('stats_page') }}" class="nav-link">İstatistikler</a>
+            </div>
+            <!-- Branch Selector -->
+            <div class="branch-selector">
+                <select id="branch-select" onchange="switchBranch(this.value)" style="background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid #8b5cf6; border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; font-size: 14px;">
+                </select>
+            </div>
+            <div class="date-filter">
+                <button class="btn-date" onclick="quickDate('today')">Bugün</button>
+                <button class="btn-date" onclick="quickDate('yesterday')">Dün</button>
+                <label for="filter-date">Tarih:</label>
+                <input type="date" id="filter-date">
+                <button class="btn-submit" onclick="printReport()" style="margin-left: 10px; padding: 6px 12px; background: #2563eb; font-size: 13px;">📄 Rapor Yazdır</button>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="lang-switch" onchange="changeLang(this.value)" style="background: rgba(15,23,42,0.8); color: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-weight: bold; cursor: pointer;">
+                    <option value="tr">🇹🇷 TR</option>
+                    <option value="en">🇬🇧 EN</option>
+                </select>
+                <button class="btn-backup" onclick="openSettings()" title="Ayarlar">⚙️</button>
+                <a href="/api/backup" class="btn-backup" title="Yedeği İndir">💾</a>
+                <a href="{{ url_for('logout') }}" class="btn-delete" style="text-decoration: none; padding: 6px 12px;">Çıkış</a>
+            </div>
+        </header>
+
+        <section class="summary-dashboard">
+            <div class="summary-card total"><div class="card-title">Toplam Ciro</div><div class="card-value" id="val-total-rev">₺0</div></div>
+            <div class="summary-card cash"><div class="card-title">Nakit Toplam</div><div class="card-value" id="val-total-cash">₺0</div></div>
+            <div class="summary-card cc"><div class="card-title">Kredi Kartı</div><div class="card-value" id="val-total-cc">₺0</div></div>
+            <div class="summary-card havale"><div class="card-title">Havale</div><div class="card-value" id="val-total-havale">₺0</div></div>
+            <div class="summary-card expense"><div class="card-title">Giderler</div><div class="card-value" id="val-total-exp">₺0</div></div>
+            <div class="summary-card remaining-cash"><div class="card-title">Kalan Nakit</div><div class="card-value" id="val-rem-cash">₺0</div></div>
+        </section>
+
+        <div class="main-content">
+            <div class="forms-column">
+                <!-- Add Vehicle -->
+                <div class="glass-panel">
+                    <h2>Araç Ekle</h2>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','otomobil','nakit')">🚗 İç-Dış Nakit</button>
+                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','otomobil','kk')">🚗 İç-Dış Kart</button>
+                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','suv','nakit')">🚙 SUV Nakit</button>
+                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','suv','kk')">🚙 SUV Kart</button>
+                    </div>
+                    <button type="button" id="btn-repeat-last" class="btn-edit" onclick="repeatLastCustomer()" style="display:none;width:100%;padding:10px;margin-bottom:12px;">↩ Son Kaydı Tekrarla</button>
+                    <p style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">⌨️ <span data-lang="1 Nakit · 2 Kart · 3 Sonra · 4 Havale · Enter Kaydet">1 Nakit · 2 Kart · 3 Sonra · 4 Havale · Enter Kaydet</span></p>
+                    <form id="vehicle-form">
+                        <div class="form-group" style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <label>Araç Plakası
+                                    <span id="loyalty-badge" style="color: var(--color-pending); font-size: 12px; margin-left: 10px; font-weight: bold;"></span>
+                                    <a id="plate-history-link" href="#" onclick="openPlateHistory(); return false;" style="display:none;font-size:11px;margin-left:8px;color:var(--color-cc);">📋 Geçmiş</a>
+                                </label>
+                                <input type="text" id="plate" list="plate-suggestions" placeholder="Örn: 34 ABC 123" required autocomplete="off" style="text-transform: uppercase;">
+                                <datalist id="plate-suggestions"></datalist>
+                                <div id="duplicate-warning" style="display:none;color:var(--color-expense);font-size:12px;font-weight:600;margin-top:6px;">⚠️ Bu plaka bugün zaten kayıtlı!</div>
+                            </div>
+                            <div style="flex:1;">
+                                <label>Tarih / Saat</label>
+                                <input type="datetime-local" id="vehicle-date" required style="width:100%; padding:12px; border-radius:8px; background:rgba(15,23,42,0.6); color:white; border:1px solid var(--border-color);">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Marka / Model (İsteğe Bağlı)</label>
+                            <input type="text" id="brand-model" placeholder="Örn: BMW X5, Ford Focus" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label>Araç Kategorisi</label>
+                            <div class="payment-toggle">
+                                <input type="radio" id="cat-otomobil" name="vehicle_category" value="otomobil" checked>
+                                <label for="cat-otomobil" class="btn-cat-otomobil">🚗 Otomobil</label>
+                                <input type="radio" id="cat-suv" name="vehicle_category" value="suv">
+                                <label for="cat-suv" class="btn-cat-suv">🚙 SUV / Ticari</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Hizmet Tipi</label>
+                            <select id="wash-type" required>
+                                <option value="İç Yıkama">Sadece İç Yıkama</option>
+                                <option value="Dış Yıkama">Sadece Dış Yıkama</option>
+                                <option value="İç-Dış Yıkama" selected>İç-Dış Yıkama</option>
+                                <option value="Motor Yıkama">Motor Yıkama</option>
+                                <option value="Detaylı Temizlik">Detaylı Temizlik</option>
+                                <option value="Pasta Cila">Pasta Cila</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ödeme Yöntemi</label>
+                            <div class="payment-toggle">
+                                <input type="radio" id="pay-cash" name="payment_method" value="nakit" checked>
+                                <label for="pay-cash" class="btn-cash">Nakit</label>
+                                <input type="radio" id="pay-cc" name="payment_method" value="kk">
+                                <label for="pay-cc" class="btn-cc">Kart</label>
+                                <input type="radio" id="pay-havale" name="payment_method" value="havale">
+                                <label for="pay-havale" class="btn-havale">Havale</label>
+                                <input type="radio" id="pay-pending" name="payment_method" value="bekliyor">
+                                <label for="pay-pending" class="btn-pending">Sonra</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Fiyat (₺) <span id="suggested-price" style="color: var(--color-cash); font-size: 12px; margin-left: 10px;"></span></label>
+                            <input type="number" id="price" placeholder="Örn: 250" required min="0">
+                        </div>
+                        <button type="submit" class="btn-submit">Aracı Kaydet</button>
+                    </form>
+                </div>
+                <!-- Add Expense -->
+                <div class="glass-panel mt-4">
+                    <h2>Gider Ekle</h2>
+                    <form id="expense-form">
+                        <div class="form-group">
+                            <label>Kategori</label>
+                            <select id="expense-category" style="padding:12px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);margin-bottom:15px;">
+                                <option value="Malzeme">Malzeme (Şampuan, vs.)</option>
+                                <option value="Personel (Günlük)">Personel (Günlük Yevmiye)</option>
+                                <option value="Personel (Haftalık)">Personel (Haftalık Maaş)</option>
+                                <option value="Personel (Avans)">Personel (Yemek / Avans)</option>
+                                <option value="Fatura">Fatura / Kira</option>
+                                <option value="Diğer" selected>Diğer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Açıklama</label>
+                            <input type="text" id="exp-desc" placeholder="Örn: Şampuan alımı" required autocomplete="off">
+                        </div>
+                        <div class="form-group" style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <label>Tutar (₺)</label>
+                                <input type="number" id="exp-amount" placeholder="Örn: 500" required min="0">
+                            </div>
+                            <div style="flex:1;">
+                                <label>Tarih / Saat</label>
+                                <input type="datetime-local" id="expense-date" required style="width:100%; padding:12px; border-radius:8px; background:rgba(15,23,42,0.6); color:white; border:1px solid var(--border-color);">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-submit btn-expense">Gideri Kaydet</button>
+                    </form>
+                </div>
+                <!-- Reconciliation -->
+                <div class="glass-panel mt-4 z-report-panel" id="z-report-box">
+                    <h2>Gün Sonu (Kasa Sayımı)</h2>
+                    <div class="form-group"><label>Çekmecedeki Nakit (₺)</label><input type="number" id="real-cash" placeholder="Kasada ne kadar nakit var?" min="0"></div>
+                    <div class="form-group"><label>Z Raporu KK Toplamı (₺)</label><input type="number" id="real-cc" placeholder="POS gün sonu rakamı" min="0"></div>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <button type="button" class="btn-submit btn-reconcile" style="flex:1;" onclick="window.calculateReconciliation()">Karşılaştır</button>
+                        <button type="button" class="btn-delete btn-close-day" style="flex:1; background:var(--color-expense);" onclick="window.closeDay()">🔒 Günü Kapat</button>
+                    </div>
+                    <div id="reconciliation-results" class="reconciliation-results" style="display:none;">
+                        <div class="rec-row"><span>Nakit Farkı:</span><span id="diff-cash" class="diff-val">₺0</span></div>
+                        <div class="rec-row"><span>KK Farkı:</span><span id="diff-cc" class="diff-val">₺0</span></div>
+                    </div>
+                </div>
+                
+                <div class="glass-panel mt-4" id="closed-day-banner" style="display:none; background: rgba(239, 68, 68, 0.1); border-color: var(--color-expense);">
+                    <h3 style="color:var(--color-expense); margin:0; display:flex; align-items:center; gap:10px; justify-content:space-between; flex-wrap:wrap;">
+                        <span><span>🔒</span> Bu Gün Kapatılmış</span>
+                        <button id="btn-reopen-day" type="button" class="btn-submit" style="display:none; padding:6px 14px; font-size:13px; background:#16a34a;" onclick="reopenDay()">🔓 Günü Yeniden Aç</button>
+                    </h3>
+                    <p style="margin-top:10px; font-size:13px; color:var(--text-muted);">Bu güne ait kayıtlar (z-raporu) dondurulmuştur. Yeni kayıt eklenemez veya silinemez.</p>
+                </div>
+                <!-- Ledger Photo -->
+                <div class="glass-panel mt-4">
+                    <h2>📸 Defter Fotoğrafı</h2>
+                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:15px;">Defteri fotoğrafla, yükle, kayıtlarla karşılaştır.</p>
+                    <div class="form-group">
+                        <input type="file" id="ledger-photo" accept="image/*" capture="environment"
+                               style="padding:10px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
+                    </div>
+                    <button type="button" class="btn-submit" onclick="uploadLedger()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">📤 Fotoğrafı Yükle</button>
+                    <div id="ledger-photos-container" style="margin-top:15px;"></div>
+                </div>
+            </div>
+
+            <div class="lists-column">
+                <div class="glass-panel">
+                    <h2 id="vehicles-title">Bugünün Araçları</h2>
+                    <div class="table-container">
+                        <table><thead><tr><th>Saat</th><th>Plaka</th><th>Hizmet</th><th>Tutar</th><th>Ödeme</th><th>İşlem</th></tr></thead>
+                        <tbody id="vehicles-body"></tbody></table>
+                    </div>
+                </div>
+                <div class="glass-panel mt-4">
+                    <h2 id="expenses-title">Bugünün Giderleri</h2>
+                    <div class="table-container">
+                        <table><thead><tr><th>Saat</th><th>Kategori</th><th>Açıklama</th><th>Tutar</th><th>İşlem</th></tr></thead>
+                        <tbody id="expenses-body"></tbody></table>
+                    </div>
+                </div>
+                <!-- Ledger Compare -->
+                <div class="glass-panel mt-4" id="ledger-compare-panel" style="display:none;">
+                    <h2>📋 Defter Karşılaştırma</h2>
+                    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:280px;">
+                            <h3 style="margin-bottom:10px;color:var(--color-cc);">📸 Defter Fotoğrafı</h3>
+                            <img id="ledger-compare-img" src="" style="width:100%;border-radius:12px;border:2px solid var(--border-color);cursor:zoom-in;" onclick="zoomLedger(this.src)">
+                        </div>
+                        <div style="flex:1;min-width:280px;">
+                            <h3 style="margin-bottom:10px;color:var(--color-cash);">💻 Kayıtlar — Teyit Et</h3>
+                            <div id="ledger-verify-list" style="max-height:500px;overflow-y:auto;"></div>
+                        </div>
+                    </div>
+                    <button class="btn-delete" style="width:100%;margin-top:15px;padding:12px;" onclick="closeLedgerCompare()">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal" style="display:none;">
+        <div class="modal-content glass-panel">
+            <h2 id="modal-plate-title">Ödeme Al</h2>
+            <div class="form-group"><label>Ödeme Yöntemi</label>
+                <div class="payment-toggle">
+                    <input type="radio" id="modal-pay-cash" name="modal_payment" value="nakit" checked><label for="modal-pay-cash" class="btn-cash">Nakit</label>
+                    <input type="radio" id="modal-pay-cc" name="modal_payment" value="kk"><label for="modal-pay-cc" class="btn-cc">Kart</label>
+                    <input type="radio" id="modal-pay-havale" name="modal_payment" value="havale"><label for="modal-pay-havale" class="btn-havale">Havale</label>
+                </div>
+            </div>
+            <div class="form-group"><label>Nihai Fiyat (₺)</label><input type="number" id="modal-price" placeholder="Örn: 250" min="0"></div>
+            <button class="btn-submit" onclick="submitPayment()">Ödemeyi Tamamla</button>
+            <button class="btn-delete" style="width:100%;margin-top:10px;padding:14px;" onclick="closeModal()">İptal</button>
+        </div>
+    </div>
+
+    <!-- Edit Vehicle Modal -->
+    <div id="edit-vehicle-modal" class="modal" style="display:none;">
+        <div class="modal-content glass-panel">
+            <h2>Araç Düzenle</h2>
+            <div class="form-group"><label>Plaka</label><input type="text" id="edit-v-plate" style="text-transform:uppercase;"></div>
+            <div class="form-group"><label>Marka / Model</label><input type="text" id="edit-v-brand" placeholder="İsteğe bağlı"></div>
+            <div class="form-group"><label>Araç Kategorisi</label>
+                <select id="edit-v-category" style="padding:12px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
+                    <option value="otomobil">🚗 Otomobil</option><option value="suv">🚙 SUV / Hafif Ticari</option>
+                </select></div>
+            <div class="form-group"><label>Hizmet Tipi</label>
+                <select id="edit-v-type" style="padding:12px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
+                    <option value="İç Yıkama">İç Yıkama</option><option value="Dış Yıkama">Dış Yıkama</option><option value="İç-Dış Yıkama">İç-Dış Yıkama</option>
+                    <option value="Motor Yıkama">Motor Yıkama</option><option value="Detaylı Temizlik">Detaylı Temizlik</option><option value="Pasta Cila">Pasta Cila</option>
+                </select></div>
+            <div class="form-group"><label>Ödeme Yöntemi</label>
+                <select id="edit-v-payment" style="padding:12px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
+                    <option value="nakit">Nakit</option><option value="kk">Kredi Kartı</option><option value="havale">Havale / EFT</option><option value="bekliyor">Sonra Ödeyecek</option>
+                </select></div>
+            <div class="form-group"><label>Fiyat (₺)</label><input type="number" id="edit-v-price" min="0"></div>
+            <button class="btn-submit" onclick="submitEditVehicle()">Güncelle</button>
+            <button class="btn-delete" style="width:100%;margin-top:10px;padding:14px;" onclick="closeEditModal('vehicle')">İptal</button>
+        </div>
+    </div>
+
+    <!-- Edit Expense Modal -->
+    <div id="edit-expense-modal" class="modal" style="display:none;">
+        <div class="modal-content glass-panel">
+            <h2>Gider Düzenle</h2>
+            <div class="form-group"><label>Kategori</label>
+                <select id="edit-e-category" style="padding:12px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
+                    <option value="Malzeme">Malzeme</option><option value="Personel (Günlük)">Personel (Günlük)</option><option value="Personel (Haftalık)">Personel (Haftalık)</option>
+                    <option value="Personel (Avans)">Personel (Avans)</option><option value="Fatura">Fatura / Kira</option><option value="Diğer">Diğer</option>
+                </select></div>
+            <div class="form-group"><label>Açıklama</label><input type="text" id="edit-e-desc"></div>
+            <div class="form-group"><label>Tutar (₺)</label><input type="number" id="edit-e-amount" min="0"></div>
+            <button class="btn-submit" onclick="submitEditExpense()">Güncelle</button>
+            <button class="btn-delete" style="width:100%;margin-top:10px;padding:14px;" onclick="closeEditModal('expense')">İptal</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal" style="display:none;">
+        <div class="modal-content glass-panel" style="max-height:90vh;overflow-y:auto;">
+            <h2 data-lang="Ayarlar">⚙️ Ayarlar</h2>
+            <div class="form-group">
+                <label data-lang="İşletme Adı">İşletme Adı</label>
+                <input type="text" id="settings-app-name" placeholder="Örn: WashTrack">
+            </div>
+            <div class="form-group">
+                <label data-lang="Yönetici Parolası (Kaldırmak için boş bırakın)">Yönetici Parolası (Kaldırmak için boş bırakın)</label>
+                <input type="password" id="settings-admin-password" placeholder="Yeni parola..." autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label>Nakit İndirimi (₺)</label>
+                <input type="number" id="settings-cash-discount" min="0" placeholder="100">
+            </div>
+            <div class="form-group">
+                <label>Fiyat Tablosu</label>
+                <div id="settings-prices-container" style="max-height:280px;overflow-y:auto;padding:8px;border-radius:8px;background:rgba(15,23,42,0.4);border:1px solid var(--border-color);"></div>
+            </div>
+            <div class="form-group">
+                <label>Yeni Şube Ekle</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="settings-branch-name" placeholder="Örn: Şube 3" style="flex:1;">
+                    <button type="button" class="btn-submit" onclick="addBranch()" style="padding:12px 16px;">Ekle</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Veritabanı Geri Yükle (.db)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="file" id="settings-restore-file" accept=".db" style="flex:1; padding:8px; border-radius:8px; background:rgba(15,23,42,0.6); color:white; border:1px solid var(--border-color);">
+                    <button type="button" class="btn-delete" onclick="restoreDb()" style="padding:12px 16px; white-space:nowrap;">Yükle</button>
+                </div>
+            </div>
+            <button class="btn-submit" onclick="saveSettings()" data-lang="Kaydet">Kaydet</button>
+            <button class="btn-delete" style="width:100%;margin-top:10px;padding:14px;" onclick="document.getElementById('settings-modal').style.display='none'">İptal</button>
+        </div>
+    </div>
+
+    <!-- Zoom Modal -->
+    <div id="zoom-modal" class="modal" style="display:none;" onclick="this.style.display='none'">
+        <div style="max-width:95vw;max-height:95vh;overflow:auto;">
+            <img id="zoom-img" src="" style="width:100%;border-radius:12px;">
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=16"></script>
+</body>
+</html>

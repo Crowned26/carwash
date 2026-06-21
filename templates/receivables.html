@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receivables - WashTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=11">
+    <script src="{{ url_for('static', filename='js/lang.js') }}?v=5"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo" id="app-logo">WashTrack</div>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Ana Panel</a>
+                <a href="{{ url_for('receivables_page') }}" class="nav-link active">Alacaklar</a>
+                <a href="{{ url_for('plate_history_page') }}" class="nav-link">Plaka Geçmişi</a>
+                <a href="{{ url_for('stats_page') }}" class="nav-link">İstatistikler</a>
+            </div>
+            <div class="branch-selector">
+                <select id="branch-select" onchange="switchBranch(this.value)" style="background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid #8b5cf6; border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; font-size: 14px;"></select>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="lang-switch" onchange="changeLang(this.value)" style="background: rgba(15,23,42,0.8); color: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-weight: bold; cursor: pointer;">
+                    <option value="tr">🇹🇷 TR</option>
+                    <option value="en">🇬🇧 EN</option>
+                </select>
+                <a href="{{ url_for('logout') }}" class="btn-delete" style="text-decoration: none; padding: 6px 12px;">Çıkış</a>
+            </div>
+        </header>
+
+        <div class="main-content" style="max-width: 900px; margin: 0 auto; display: block;">
+            <div class="glass-panel mt-4">
+                <h2 style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Açık Hesap / Alacaklar Listesi</span>
+                    <span style="font-size:14px; color:var(--text-muted);">Toplam Bekleyen: <strong id="grand-total" style="color:var(--color-expense);">₺0</strong></span>
+                </h2>
+                <div class="table-container" style="margin-top: 20px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Plaka</th>
+                                <th>Marka / Model</th>
+                                <th>Araç Adedi</th>
+                                <th>Son Geliş Tarihi</th>
+                                <th>Toplam Borç</th>
+                                <th>İşlem (Toplu Tahsilat)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receivables-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="payment-modal" class="modal" style="display:none;">
+        <div class="modal-content glass-panel">
+            <h2 id="modal-plate-title">Toplu Ödeme Al</h2>
+            <div class="form-group"><label>Ödeme Yöntemi</label>
+                <div class="payment-toggle">
+                    <input type="radio" id="modal-pay-cash" name="modal_payment" value="nakit" checked><label for="modal-pay-cash" class="btn-cash">Nakit</label>
+                    <input type="radio" id="modal-pay-cc" name="modal_payment" value="kk"><label for="modal-pay-cc" class="btn-cc">Kart</label>
+                    <input type="radio" id="modal-pay-havale" name="modal_payment" value="havale"><label for="modal-pay-havale" class="btn-havale">Havale</label>
+                </div>
+            </div>
+            <p style="color:var(--color-expense); font-weight:bold; margin-bottom: 5px;">Tahsil Edilecek Tutar: <span id="modal-price"></span></p>
+            <p id="modal-discount-note" style="color:var(--color-cash); font-size:13px; margin-bottom: 15px;"></p>
+            <button class="btn-submit" onclick="submitPayment()">Tüm Borcu Kapat</button>
+            <button class="btn-delete" style="width:100%; margin-top:10px; padding:14px;" onclick="closeModal()">İptal</button>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        const formatCurrency = (a) => new Intl.NumberFormat(getLocale(),{style:'currency',currency:'TRY'}).format(a);
+        const formatTime = (d) => { const date = new Date(d); return date.toLocaleDateString(getLocale()) + ' ' + date.toLocaleTimeString(getLocale(),{hour:'2-digit',minute:'2-digit'}); };
+        let currentBranch = localStorage.getItem('branch') || 'Şube 1';
+        let cashDiscount = 100;
+        window.cashDiscount = cashDiscount;
+        let modalDebt = 0, modalWashCount = 0;
+
+        const calcPrice = (amount, pm, washCount = 1) => {
+            const base = Number(amount) || 0;
+            return pm === 'nakit' ? Math.max(0, base - cashDiscount * washCount) : base;
+        };
+        const updateBulkModalPrice = () => {
+            const m = document.querySelector('input[name="modal_payment"]:checked')?.value;
+            const el = document.getElementById('modal-price');
+            if(!el) return;
+            el.innerText = formatCurrency(calcPrice(modalDebt, m, modalWashCount));
+            const note = document.getElementById('modal-discount-note');
+            if(note) note.innerText = (m === 'nakit' && modalWashCount > 0) ? tCashDiscountNote(modalWashCount, cashDiscount) : '';
+        };
+
+        window.showToast = (msg, type='success') => {
+            const c = document.getElementById('toast-container'), el = document.createElement('div');
+            el.className = 'toast'; if(type==='error') el.style.backgroundColor='var(--color-expense)';
+            el.innerText = t(msg); c.appendChild(el); setTimeout(()=>el.remove(), 3000);
+        };
+
+        async function initPage() {
+            try {
+                const res = await fetch('/api/settings'); const data = await res.json();
+                const titleSuffix = currentLang === 'en' ? 'Receivables' : 'Açık Hesap';
+                if(data.settings.app_name) { document.getElementById('app-logo').innerText = data.settings.app_name; document.title = titleSuffix + ' - ' + data.settings.app_name; }
+                if(data.settings.cash_discount) { cashDiscount = parseFloat(data.settings.cash_discount) || 100; window.cashDiscount = cashDiscount; }
+                const sel = document.getElementById('branch-select'); sel.innerHTML = '';
+                data.branches.forEach(b => { const o = document.createElement('option'); o.value=b; o.textContent=tBranch(b); if(b===currentBranch) o.selected=true; sel.appendChild(o); });
+                if(!data.branches.includes(currentBranch) && data.branches.length) { currentBranch=data.branches[0]; localStorage.setItem('branch',currentBranch); sel.value=currentBranch; }
+            } catch(e) { }
+            loadReceivables();
+        }
+
+        window.switchBranch = (b) => { currentBranch = b; localStorage.setItem('branch', b); loadReceivables(); };
+
+        const loadReceivables = async () => {
+            try {
+                const res = await fetch(`/api/receivables_data?branch=${encodeURIComponent(currentBranch)}`);
+                const data = await res.json();
+                const tbody = document.getElementById('receivables-body');
+                tbody.innerHTML = '';
+                let grandTotal = 0;
+                if(!data.receivables.length) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">${t('Açık hesap / Borçlu kayıt bulunamadı.')}</td></tr>`;
+                } else {
+                    data.receivables.forEach(r => {
+                        grandTotal += r.total_debt;
+                        const tr = document.createElement('tr');
+                        const bm = r.brand_model ? `<span style="font-size:11px;color:var(--text-muted);display:block;">${r.brand_model}</span>` : '-';
+                        tr.innerHTML = `
+                            <td style="font-weight:bold; font-size:16px;">${r.plate}</td>
+                            <td>${bm}</td>
+                            <td><span class="badge" style="background:rgba(255,255,255,0.1); color:white;">${r.wash_count} ${t('Yıkama')}</span></td>
+                            <td>${formatTime(r.last_visit)}</td>
+                            <td style="font-weight:bold; color:var(--color-expense); font-size:16px;">${formatCurrency(r.total_debt)}</td>
+                            <td><button class="btn-pay" onclick="openPaymentModal('${r.plate}', ${r.total_debt}, ${r.wash_count})">${t('Toplu Tahsil Et')}</button></td>`;
+                        tbody.appendChild(tr);
+                    });
+                }
+                document.getElementById('grand-total').innerText = formatCurrency(grandTotal);
+            } catch(e) { console.error(e); }
+        };
+
+        let currentPaymentPlate = null;
+        window.openPaymentModal = (plate, totalDebt, washCount) => {
+            currentPaymentPlate = plate;
+            modalDebt = totalDebt;
+            modalWashCount = washCount || 1;
+            document.getElementById('modal-plate-title').innerText = plate + ' - ' + t('Toplu Tahsilat');
+            document.getElementById('modal-pay-cash').checked = true;
+            updateBulkModalPrice();
+            document.getElementById('payment-modal').style.display = 'flex';
+        };
+        document.querySelectorAll('input[name="modal_payment"]').forEach(r => r.addEventListener('change', updateBulkModalPrice));
+        window.closeModal = () => { document.getElementById('payment-modal').style.display = 'none'; currentPaymentPlate = null; modalDebt = 0; modalWashCount = 0; };
+
+        window.submitPayment = async () => {
+            const m = document.querySelector('input[name="modal_payment"]:checked').value;
+            if(!currentPaymentPlate) return;
+            try {
+                const r = await fetch(`/api/pay_bulk`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ plate: currentPaymentPlate, payment_method: m, branch: currentBranch })
+                });
+                if(r.ok) { closeModal(); loadReceivables(); showToast('✅ Tahsilat yapıldı! Borç kapatıldı.'); }
+                else showToast('Hata oluştu!', 'error');
+            } catch(e) {}
+        };
+
+        initPage();
+    </script>
+</body>
+</html>

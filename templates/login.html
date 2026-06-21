@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - {{ app_name|default('WashTrack') }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4">
+    <script src="{{ url_for('static', filename='js/lang.js') }}?v=5"></script>
+    <style>
+        .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-box { width: 100%; max-width: 400px; padding: 40px; text-align: center; }
+        .login-box h1 { margin-bottom: 30px; font-size: 28px; }
+        .login-box input { margin-bottom: 20px; text-align: center; font-size: 18px; letter-spacing: 2px; }
+        .error-msg { color: var(--color-expense); margin-bottom: 15px; font-weight: 600; }
+        .lang-row { margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box glass-panel">
+            <div class="lang-row">
+                <select id="lang-switch" onchange="changeLang(this.value)" style="background: rgba(15,23,42,0.8); color: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-weight: bold; cursor: pointer;">
+                    <option value="tr">🇹🇷 TR</option>
+                    <option value="en">🇬🇧 EN</option>
+                </select>
+            </div>
+            <h1>{{ app_name|default('WashTrack') }}</h1>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Sisteme erişmek için şifrenizi girin.</p>
+            {% if error %}
+            <div class="error-msg" id="login-error">{{ error }}</div>
+            {% endif %}
+            <form method="POST">
+                <input type="password" name="password" placeholder="••••" required autofocus autocomplete="off">
+                <button type="submit" class="btn-submit">Sistemi Aç</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        if (document.getElementById('login-error')) {
+            const err = document.getElementById('login-error');
+            err.textContent = t(err.textContent.trim());
+        }
+    </script>
+</body>
+</html>

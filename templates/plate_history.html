@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plate History - WashTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=11">
+    <script src="{{ url_for('static', filename='js/lang.js') }}?v=5"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo" id="app-logo">WashTrack</div>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Ana Panel</a>
+                <a href="{{ url_for('receivables_page') }}" class="nav-link">Alacaklar</a>
+                <a href="{{ url_for('plate_history_page') }}" class="nav-link active">Plaka Geçmişi</a>
+                <a href="{{ url_for('stats_page') }}" class="nav-link">İstatistikler</a>
+            </div>
+            <div class="branch-selector">
+                <select id="branch-select" onchange="switchBranch(this.value)" style="background:rgba(139,92,246,0.2);color:#a78bfa;border:1px solid #8b5cf6;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:14px;"></select>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <select id="lang-switch" onchange="changeLang(this.value)" style="background:rgba(15,23,42,0.8);color:white;border:1px solid var(--border-color);border-radius:6px;padding:4px 8px;font-weight:bold;cursor:pointer;">
+                    <option value="tr">🇹🇷 TR</option>
+                    <option value="en">🇬🇧 EN</option>
+                </select>
+                <a href="{{ url_for('logout') }}" class="btn-delete" style="text-decoration:none;padding:6px 12px;">Çıkış</a>
+            </div>
+        </header>
+
+        <div class="main-content" style="max-width:960px;margin:0 auto;display:block;">
+            <div class="glass-panel mt-4">
+                <h2>Plaka Geçmişi</h2>
+                <div class="form-group" style="display:flex;gap:10px;align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label>Plaka Ara</label>
+                        <input type="text" id="search-plate" list="plate-suggestions" placeholder="Örn: 34 ABC 123" style="text-transform:uppercase;width:100%;padding:12px;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
+                        <datalist id="plate-suggestions"></datalist>
+                    </div>
+                    <button class="btn-submit" onclick="searchHistory()" style="padding:12px 24px;">Ara</button>
+                </div>
+            </div>
+
+            <div id="summary-panel" class="glass-panel mt-4" style="display:none;">
+                <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h2 id="summary-plate" style="margin:0;font-size:22px;"></h2>
+                        <p id="summary-meta" style="color:var(--text-muted);margin-top:6px;font-size:14px;"></p>
+                    </div>
+                    <div style="display:flex;gap:24px;text-align:center;">
+                        <div><div style="color:var(--text-muted);font-size:12px;">Toplam Ziyaret</div><div id="sum-visits" style="font-size:20px;font-weight:700;">0</div></div>
+                        <div><div style="color:var(--text-muted);font-size:12px;">Toplam Harcama</div><div id="sum-spent" style="font-size:20px;font-weight:700;color:var(--color-cash);">₺0</div></div>
+                        <div><div style="color:var(--text-muted);font-size:12px;">Açık Borç</div><div id="sum-debt" style="font-size:20px;font-weight:700;color:var(--color-expense);">₺0</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel mt-4">
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Tarih</th><th>Hizmet</th><th>Tutar</th><th>Ödeme</th></tr></thead>
+                        <tbody id="history-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="toast-container" class="toast-container"></div>
+    <script>
+        const formatCurrency = (a) => new Intl.NumberFormat(getLocale(),{style:'currency',currency:'TRY'}).format(a);
+        const formatDateTime = (d) => new Date(d).toLocaleString(getLocale(),{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        let currentBranch = localStorage.getItem('branch') || 'Şube 1';
+        let suggestTimer;
+
+        window.showToast = (msg, type='success') => {
+            const c = document.getElementById('toast-container'), el = document.createElement('div');
+            el.className = 'toast'; if(type==='error') el.style.backgroundColor='var(--color-expense)';
+            el.innerText = t(msg); c.appendChild(el); setTimeout(()=>el.remove(), 3000);
+        };
+
+        async function initPage() {
+            const res = await fetch('/api/settings'); const data = await res.json();
+            const titleSuffix = currentLang === 'en' ? 'Plate History' : 'Plaka Geçmişi';
+            if(data.settings.app_name) { document.getElementById('app-logo').innerText = data.settings.app_name; document.title = titleSuffix + ' - ' + data.settings.app_name; }
+            const sel = document.getElementById('branch-select'); sel.innerHTML = '';
+            data.branches.forEach(b => { const o = document.createElement('option'); o.value=b; o.textContent=tBranch(b); if(b===currentBranch) o.selected=true; sel.appendChild(o); });
+            const params = new URLSearchParams(location.search);
+            if(params.get('plate')) { document.getElementById('search-plate').value = params.get('plate'); searchHistory(); }
+        }
+
+        window.switchBranch = (b) => { currentBranch = b; localStorage.setItem('branch', b); searchHistory(); };
+
+        const loadSuggestions = async (q) => {
+            if(q.replace(/\s/g,'').length < 2) return;
+            const r = await fetch(`/api/plate_suggest?q=${encodeURIComponent(q.replace(/\s/g,''))}&branch=${encodeURIComponent(currentBranch)}`);
+            const d = await r.json();
+            document.getElementById('plate-suggestions').innerHTML = d.plates.map(p => `<option value="${p}">`).join('');
+        };
+
+        document.getElementById('search-plate').addEventListener('input', (e) => {
+            clearTimeout(suggestTimer);
+            suggestTimer = setTimeout(() => loadSuggestions(e.target.value.trim().toUpperCase()), 300);
+        });
+        document.getElementById('search-plate').addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.preventDefault(); searchHistory(); } });
+
+        window.searchHistory = async () => {
+            const plate = document.getElementById('search-plate').value.trim().toUpperCase();
+            if(!plate) { showToast('Plaka girin!', 'error'); return; }
+            try {
+                const r = await fetch(`/api/plate_history?plate=${encodeURIComponent(plate)}&branch=${encodeURIComponent(currentBranch)}`);
+                const data = await r.json();
+                const tbody = document.getElementById('history-body');
+                tbody.innerHTML = '';
+                if(!data.vehicles.length) {
+                    document.getElementById('summary-panel').style.display = 'none';
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">${t('Kayıt bulunamadı.')}</td></tr>`;
+                    return;
+                }
+                document.getElementById('summary-panel').style.display = 'block';
+                document.getElementById('summary-plate').innerText = plate;
+                const catLabel = data.summary.vehicle_category === 'suv' ? t('🚙 SUV') : t('🚗 Otomobil');
+                const meta = data.summary.brand_model ? data.summary.brand_model + ' · ' + catLabel : '';
+                document.getElementById('summary-meta').innerText = meta;
+                document.getElementById('sum-visits').innerText = data.summary.total_visits;
+                document.getElementById('sum-spent').innerText = formatCurrency(data.summary.total_spent);
+                document.getElementById('sum-debt').innerText = formatCurrency(data.summary.pending_debt);
+                data.vehicles.forEach(v => {
+                    const tr = document.createElement('tr');
+                    const pm = tPaymentPm(v.payment_method);
+                    tr.innerHTML = `<td>${formatDateTime(v.created_at)}</td><td>${tWashType(v.wash_type)}</td><td style="font-weight:600;">${formatCurrency(v.price)}</td><td>${pm}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) { showToast('Hata!', 'error'); }
+        };
+
+        initPage();
+    </script>
+</body>
+</html>

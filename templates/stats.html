@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İstatistikler - WashTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=10">
+    <script src="{{ url_for('static', filename='js/lang.js') }}?v=5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo" id="app-logo">WashTrack</div>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Ana Panel</a>
+                <a href="{{ url_for('receivables_page') }}" class="nav-link">Alacaklar</a>
+                <a href="{{ url_for('plate_history_page') }}" class="nav-link">Plaka Geçmişi</a>
+                <a href="{{ url_for('stats_page') }}" class="nav-link active">İstatistikler</a>
+            </div>
+            <div class="branch-selector">
+                <select id="branch-select" onchange="currentBranch=this.value;localStorage.setItem('branch',this.value);loadStats();" style="background:rgba(139,92,246,0.2);color:#a78bfa;border:1px solid #8b5cf6;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:14px;"></select>
+            </div>
+            <div style="display:flex;gap:15px;align-items:center;">
+                <select id="lang-switch" onchange="changeLang(this.value)" style="background:rgba(15,23,42,0.8);color:white;border:1px solid var(--border-color);border-radius:6px;padding:4px 8px;font-weight:bold;cursor:pointer;">
+                    <option value="tr">🇹🇷 TR</option><option value="en">🇬🇧 EN</option>
+                </select>
+                <a href="/api/backup" class="btn-backup" title="Yedeği İndir">💾</a>
+                <a href="{{ url_for('logout') }}" class="btn-delete" style="text-decoration:none;padding:6px 12px;">Çıkış</a>
+            </div>
+        </header>
+        <div class="stats-grid">
+            <div class="glass-panel stat-card" style="grid-column:span 2;"><h2>Son 7 Günlük Ciro (₺)</h2><canvas id="revenueChart" height="80"></canvas></div>
+            <div class="glass-panel stat-card"><h2>Aylık Gider Dağılımı</h2><div style="position:relative;height:300px;width:100%;display:flex;justify-content:center;"><canvas id="expenseChart"></canvas></div></div>
+            <div class="glass-panel stat-card"><h2>Aylık Yıkama Dağılımı</h2><div style="position:relative;height:300px;width:100%;display:flex;justify-content:center;"><canvas id="washChart"></canvas></div></div>
+        </div>
+    </div>
+    <script>
+        let currentBranch = localStorage.getItem('branch') || 'Şube 1';
+        let charts = [];
+        async function initPage() {
+            try {
+                const r = await fetch('/api/settings'); const d = await r.json();
+                if(d.settings.app_name) { document.getElementById('app-logo').innerText = d.settings.app_name; document.title = (currentLang === 'en' ? 'Statistics' : 'İstatistikler') + ' - ' + d.settings.app_name; }
+                const sel = document.getElementById('branch-select'); sel.innerHTML = '';
+                d.branches.forEach(b => { const o = document.createElement('option'); o.value=b; o.textContent=tBranch(b); if(b===currentBranch) o.selected=true; sel.appendChild(o); });
+            } catch(e) {}
+            loadStats();
+        }
+        async function loadStats() {
+            try {
+                charts.forEach(c => c.destroy()); charts = [];
+                const res = await fetch(`/api/stats_data?branch=${encodeURIComponent(currentBranch)}`);
+                const data = await res.json();
+                const cc='rgba(59,130,246,0.8)',ca='rgba(16,185,129,0.8)',ex='rgba(239,68,68,0.8)',pu='rgba(139,92,246,0.8)',am='rgba(245,158,11,0.8)',te='rgba(20,184,166,0.8)';
+                Chart.defaults.color='#94a3b8'; Chart.defaults.font.family="'Inter',sans-serif";
+                charts.push(new Chart(document.getElementById('revenueChart'),{type:'bar',data:{labels:data.revenue.labels,datasets:[{label:t('Ciro (₺)'),data:data.revenue.data,backgroundColor:cc,borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'}},x:{grid:{display:false}}}}}));
+                charts.push(new Chart(document.getElementById('expenseChart'),{type:'doughnut',data:{labels:data.expenses.labels.map(l=>typeof t==='function'?t(l):l),datasets:[{data:data.expenses.data,backgroundColor:[ex,am,pu,cc,ca,te],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%'}}));
+                charts.push(new Chart(document.getElementById('washChart'),{type:'doughnut',data:{labels:data.wash_types.labels.map(l=>typeof t==='function'?t(l):l),datasets:[{data:data.wash_types.data,backgroundColor:[ca,cc,pu,am,te,ex],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%'}}));
+            } catch(e) { console.error(e); }
+        }
+        initPage();
+    </script>
+</body>
+</html>
