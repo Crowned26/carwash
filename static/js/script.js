@@ -619,7 +619,8 @@ const renderLedgerImportTable = () => {
         }
     });
     const cnt = document.getElementById('ledger-import-count');
-    if (cnt) cnt.textContent = `${ledgerImportRows.length} ${t('kayıt bulundu')}`;
+    const valid = ledgerImportRows.filter(r => r.plate && r.price);
+    if (cnt) cnt.textContent = `${valid.length} ${t('kayıt bulundu')}`;
 };
 
 window.addLedgerImportRow = () => {
@@ -641,14 +642,15 @@ const openLedgerImportModal = (data) => {
     if (prev && ledgerImportFilename) prev.src = `/static/uploads/${ledgerImportFilename}`;
     const warn = document.getElementById('ledger-import-warn');
     if (warn) {
-        if (!data.ocr_available || data.ocr_error) {
+        if (data.ocr_error) {
             warn.style.display = 'block';
-            warn.textContent = t(data.ocr_error) || t('Tesseract kurulu değil');
+            warn.textContent = t(data.ocr_error) || data.ocr_error;
         } else if (!ledgerImportRows.length) {
             warn.style.display = 'block';
             warn.textContent = t('Okunan kayıt yok. Satır ekleyebilir veya fotoğrafı yeniden çekebilirsin.');
         } else warn.style.display = 'none';
     }
+    if (!ledgerImportRows.length) addLedgerImportRow();
     renderLedgerImportTable();
     document.getElementById('ledger-import-modal').style.display = 'flex';
 };

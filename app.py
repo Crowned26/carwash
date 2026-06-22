@@ -738,7 +738,11 @@ def scan_ledger():
     conn.close()
 
     ocr_ok = ledger_ocr.ocr_available()
-    raw_text, ocr_err = ledger_ocr.run_ocr(filepath) if ocr_ok else ('', 'Tesseract kurulu değil')
+    raw_text, ocr_err = ('', None)
+    if ocr_ok:
+        raw_text, ocr_err = ledger_ocr.run_ocr(filepath)
+    else:
+        ocr_err = 'Tesseract kurulu değil'
     rows = ledger_ocr.parse_ocr_text(raw_text) if raw_text else []
 
     for row in rows:
