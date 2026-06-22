@@ -101,9 +101,13 @@ const setFormDates = () => {
 
 // Toast
 window.showToast = (msg, type='success') => {
-    const c = document.getElementById('toast-container'), t = document.createElement('div');
-    t.className = 'toast'; if(type==='error') t.style.backgroundColor='var(--color-expense)';
-    t.innerText = t(msg); c.appendChild(t); setTimeout(()=>t.remove(), 3000);
+    const c = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = 'toast';
+    if (type === 'error') el.style.backgroundColor = 'var(--color-expense)';
+    el.innerText = t(msg);
+    c.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
 };
 
 // Date filter
@@ -411,6 +415,7 @@ document.addEventListener('keydown', (e) => {
 
 // Plate checker, autocomplete & auto-fill
 const plateInput = document.getElementById('plate'); let typingTimer;
+if (plateInput) {
 plateInput.addEventListener('input', (e) => {
     let p_format = e.target.value.replace(/\s/g, '').toUpperCase();
     const m = p_format.match(/^([0-9]{2})([A-Z]{1,3})([0-9]{0,4})$/);
@@ -430,7 +435,9 @@ plateInput.addEventListener('change', () => {
     const p = plateInput.value.trim().toUpperCase();
     if(p.length >= 5) lookupPlate(p);
 });
-document.getElementById('vehicle-date').addEventListener('change', () => {
+}
+document.getElementById('vehicle-date')?.addEventListener('change', () => {
+    if (!plateInput) return;
     const p = plateInput.value.trim().toUpperCase();
     if(p.length >= 5) lookupPlate(p);
 });
@@ -652,19 +659,31 @@ window.closeLedgerImportModal = () => {
 
 window.scanLedger = async () => {
     const fi = document.getElementById('ledger-photo');
-    if (!fi.files.length) { showToast(t('Fotoğraf seçin!'), 'error'); return; }
+    const btn = document.getElementById('btn-scan-ledger');
+    if (!fi || !fi.files.length) { showToast(t('Fotoğraf seçin!'), 'error'); return; }
+    const prevLabel = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = t('Okunuyor...'); }
+    showToast(t('Defter okunuyor, lütfen bekleyin...'));
     const fd = new FormData();
     fd.append('photo', fi.files[0]);
     fd.append('photo_date', filterDateInput.value || todayStr);
     fd.append('branch', currentBranch);
     try {
         const r = await fetch('/api/scan_ledger', { method: 'POST', body: fd });
-        const d = await r.json();
+        let d;
+        try { d = await r.json(); } catch (parseErr) {
+            showToast(t('Hata!'), 'error');
+            return;
+        }
         if (!r.ok) { showToast(t(d.error) || t('Başarısız!'), 'error'); return; }
         fi.value = '';
         loadLedgerPhotos();
         openLedgerImportModal(d);
-    } catch (e) { showToast(t('Hata!'), 'error'); }
+    } catch (e) {
+        showToast(t('Hata!'), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = prevLabel; }
+    }
 };
 
 window.submitLedgerImport = async () => {

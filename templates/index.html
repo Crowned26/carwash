@@ -190,7 +190,7 @@
                         <input type="file" id="ledger-photo" accept="image/*" capture="environment"
                                style="padding:10px;width:100%;border-radius:8px;background:rgba(15,23,42,0.6);color:white;border:1px solid var(--border-color);">
                     </div>
-                    <button type="button" class="btn-submit" onclick="scanLedger()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">📷 Oku ve Onayla</button>
+                    <button type="button" id="btn-scan-ledger" class="btn-submit" onclick="scanLedger()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">📷 Oku ve Onayla</button>
                     <div id="ledger-photos-container" style="margin-top:15px;"></div>
                 </div>
             </div>
@@ -368,6 +368,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}?v=18"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=19"></script>
 </body>
 </html>
