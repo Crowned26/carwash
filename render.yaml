@@ -1,9 +1,9 @@
 services:
   - type: web
     name: carwash
-    runtime: python
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 180 app:app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
     envVars:
       - key: FLASK_DEBUG
         value: "0"

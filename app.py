@@ -1022,7 +1022,10 @@ def print_report():
 
 @app.route('/health')
 def health():
-    return jsonify({'status': 'ok'}), 200
+    return jsonify({
+        'status': 'ok',
+        'ocr_available': ledger_ocr.ocr_available(),
+    }), 200
 
 
 if __name__ == '__main__':
