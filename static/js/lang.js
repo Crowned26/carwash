@@ -244,6 +244,7 @@ const dictionary = {
     "Sadece .db dosyası yüklenebilir!": "Only .db files allowed.",
     "Dosya seçilmedi!": "No file selected!",
     "Geçersiz dosya tipi! (png, jpg, gif, webp)": "Invalid file type! (png, jpg, gif, webp)",
+    "Geçersiz dosya tipi! (png, jpg, gif, webp, heic)": "Invalid file type! (png, jpg, gif, webp, heic)",
     "Fotoğraf yüklenmedi!": "No photo uploaded!",
     "Fiyat gerekli!": "Price required!",
     "Kayıt bulunamadı!": "Record not found!",

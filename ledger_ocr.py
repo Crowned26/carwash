@@ -1,5 +1,20 @@
+import os
 import re
 import shutil
+
+HEIF_REGISTERED = False
+
+
+def register_heif():
+    global HEIF_REGISTERED
+    if HEIF_REGISTERED:
+        return
+    try:
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+        HEIF_REGISTERED = True
+    except ImportError:
+        pass
 
 PLATE_RE = re.compile(r'\b(\d{2})\s*([A-Z]{1,3})\s*(\d{2,4})\b', re.IGNORECASE)
 AMOUNT_RE = re.compile(r'(?:₺|TL)?\s*(\d{2,4})(?:[.,](\d{2}))?\s*(?:₺|TL)?', re.IGNORECASE)
@@ -74,6 +89,23 @@ def parse_ocr_text(text):
     return rows
 
 
+def normalize_image_file(filepath):
+    """HEIC/HEIF → JPEG (tarayıcı + OCR uyumu)."""
+    register_heif()
+    ext = filepath.rsplit('.', 1)[-1].lower() if '.' in filepath else ''
+    if ext not in ('heic', 'heif'):
+        return filepath, os.path.basename(filepath)
+    try:
+        from PIL import Image
+        jpg_path = filepath.rsplit('.', 1)[0] + '.jpg'
+        with Image.open(filepath) as img:
+            img.convert('RGB').save(jpg_path, 'JPEG', quality=90)
+        os.remove(filepath)
+        return jpg_path, os.path.basename(jpg_path)
+    except Exception as e:
+        return None, f'HEIC dosyası dönüştürülemedi: {e}'
+
+
 def run_ocr(image_path):
     try:
         import pytesseract
@@ -84,6 +116,7 @@ def run_ocr(image_path):
     if not shutil.which('tesseract'):
         return '', 'Tesseract kurulu değil. Mac: brew install tesseract tesseract-lang'
 
+    register_heif()
     img = Image.open(image_path)
     if max(img.size) > 2000:
         img.thumbnail((2000, 2000))

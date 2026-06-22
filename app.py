@@ -14,7 +14,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'oto_yikama_pro_gizli_anahtar')
 DB_FILE = os.environ.get('DATABASE_PATH', 'yikama.db')
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-ALLOWED_UPLOAD_EXT = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+ALLOWED_UPLOAD_EXT = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif'}
+INVALID_FILE_MSG = 'Geçersiz dosya tipi! (png, jpg, gif, webp, heic)'
 
 DEFAULT_PRICES = {
     'İç-Dış Yıkama': {'otomobil': 900, 'suv': 1000},
@@ -27,6 +28,39 @@ DEFAULT_PRICES = {
 DEFAULT_CASH_DISCOUNT = 100
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def _upload_ext(filename, mimetype=''):
+    if filename and '.' in filename:
+        ext = filename.rsplit('.', 1)[-1].lower()
+        if ext in ALLOWED_UPLOAD_EXT:
+            return ext
+    mime = (mimetype or '').lower()
+    for mt, ext in (
+        ('image/heic', 'heic'), ('image/heif', 'heif'),
+        ('image/jpeg', 'jpg'), ('image/png', 'png'),
+        ('image/webp', 'webp'), ('image/gif', 'gif'),
+    ):
+        if mime == mt:
+            return ext
+    return ''
+
+
+def _save_ledger_image(photo, photo_date):
+    ext = _upload_ext(photo.filename, photo.content_type)
+    if not ext:
+        return None, None, INVALID_FILE_MSG
+    safe = secure_filename(photo.filename)
+    base = safe.rsplit('.', 1)[0][:20] if safe else 'photo'
+    filename = f"ledger_{photo_date}_{datetime.datetime.now().strftime('%H%M%S')}_{base}.{ext}"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    photo.save(filepath)
+    filepath, filename = ledger_ocr.normalize_image_file(filepath)
+    if filepath is None:
+        return None, None, filename
+    return filepath, filename, None
+
+
 
 
 def get_db_connection():
@@ -619,15 +653,14 @@ def upload_ledger():
     photo = request.files['photo']
     if photo.filename == '':
         return jsonify({'error': 'Dosya seçilmedi!'}), 400
-    ext = photo.filename.rsplit('.', 1)[-1].lower() if '.' in photo.filename else ''
-    if ext not in ALLOWED_UPLOAD_EXT:
-        return jsonify({'error': 'Geçersiz dosya tipi! (png, jpg, gif, webp)'}), 400
+    ext = _upload_ext(photo.filename, photo.content_type)
+    if not ext:
+        return jsonify({'error': INVALID_FILE_MSG}), 400
     photo_date = request.form.get('photo_date', datetime.datetime.now().strftime('%Y-%m-%d'))
     branch = request.form.get('branch', 'Şube 1')
-    safe = secure_filename(photo.filename)
-    base = safe.rsplit('.', 1)[0][:20] if safe else 'photo'
-    filename = f"ledger_{photo_date}_{datetime.datetime.now().strftime('%H%M%S')}_{base}.{ext}"
-    photo.save(os.path.join(UPLOAD_FOLDER, filename))
+    filepath, filename, err = _save_ledger_image(photo, photo_date)
+    if err:
+        return jsonify({'error': err}), 400
     now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     conn = get_db_connection()
     conn.execute(
@@ -676,17 +709,15 @@ def scan_ledger():
     photo = request.files['photo']
     if photo.filename == '':
         return jsonify({'error': 'Dosya seçilmedi!'}), 400
-    ext = photo.filename.rsplit('.', 1)[-1].lower() if '.' in photo.filename else ''
-    if ext not in ALLOWED_UPLOAD_EXT:
-        return jsonify({'error': 'Geçersiz dosya tipi! (png, jpg, gif, webp)'}), 400
+    ext = _upload_ext(photo.filename, photo.content_type)
+    if not ext:
+        return jsonify({'error': INVALID_FILE_MSG}), 400
 
     photo_date = request.form.get('photo_date', datetime.datetime.now().strftime('%Y-%m-%d'))
     branch = request.form.get('branch', 'Şube 1')
-    safe = secure_filename(photo.filename)
-    base = safe.rsplit('.', 1)[0][:20] if safe else 'photo'
-    filename = f"ledger_{photo_date}_{datetime.datetime.now().strftime('%H%M%S')}_{base}.{ext}"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    photo.save(filepath)
+    filepath, filename, err = _save_ledger_image(photo, photo_date)
+    if err:
+        return jsonify({'error': err}), 400
 
     now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     conn = get_db_connection()

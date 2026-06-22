@@ -1,2 +1,3 @@
 tesseract-ocr
 tesseract-ocr-tur
+libheif1
