@@ -8,6 +8,8 @@ import json
 import os
 import shutil
 
+import ledger_ocr
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'oto_yikama_pro_gizli_anahtar')
 DB_FILE = os.environ.get('DATABASE_PATH', 'yikama.db')
@@ -564,6 +566,21 @@ def plate_suggest():
     return jsonify({'plates': [r['plate'] for r in rows]})
 
 
+@app.route('/api/recent_plates', methods=['GET'])
+@login_required
+def recent_plates():
+    branch = request.args.get('branch', 'Şube 1')
+    limit = min(int(request.args.get('limit', 8)), 12)
+    conn = get_db_connection()
+    rows = conn.execute(
+        '''SELECT plate, brand_model FROM vehicles
+           WHERE branch=? GROUP BY plate ORDER BY MAX(id) DESC LIMIT ?''',
+        (branch, limit),
+    ).fetchall()
+    conn.close()
+    return jsonify({'plates': [dict(r) for r in rows]})
+
+
 @app.route('/api/plate_history', methods=['GET'])
 @login_required
 def plate_history_data():
@@ -649,6 +666,110 @@ def delete_ledger(id):
         conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+
+@app.route('/api/scan_ledger', methods=['POST'])
+@login_required
+def scan_ledger():
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Fotoğraf yüklenmedi!'}), 400
+    photo = request.files['photo']
+    if photo.filename == '':
+        return jsonify({'error': 'Dosya seçilmedi!'}), 400
+    ext = photo.filename.rsplit('.', 1)[-1].lower() if '.' in photo.filename else ''
+    if ext not in ALLOWED_UPLOAD_EXT:
+        return jsonify({'error': 'Geçersiz dosya tipi! (png, jpg, gif, webp)'}), 400
+
+    photo_date = request.form.get('photo_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+    branch = request.form.get('branch', 'Şube 1')
+    safe = secure_filename(photo.filename)
+    base = safe.rsplit('.', 1)[0][:20] if safe else 'photo'
+    filename = f"ledger_{photo_date}_{datetime.datetime.now().strftime('%H%M%S')}_{base}.{ext}"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    photo.save(filepath)
+
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db_connection()
+    conn.execute(
+        'INSERT INTO ledger_photos (filename, photo_date, branch, created_at) VALUES (?, ?, ?, ?)',
+        (filename, photo_date, branch, now),
+    )
+    conn.commit()
+
+    ts = f'{photo_date} 00:00:00'
+    te = f'{photo_date} 23:59:59'
+    existing = {
+        r['plate'] for r in conn.execute(
+            'SELECT DISTINCT plate FROM vehicles WHERE branch=? AND created_at>=? AND created_at<=?',
+            (branch, ts, te),
+        ).fetchall()
+    }
+    conn.close()
+
+    ocr_ok = ledger_ocr.ocr_available()
+    raw_text, ocr_err = ledger_ocr.run_ocr(filepath) if ocr_ok else ('', 'Tesseract kurulu değil')
+    rows = ledger_ocr.parse_ocr_text(raw_text) if raw_text else []
+
+    for row in rows:
+        row['already_today'] = row['plate'] in existing
+
+    return jsonify({
+        'success': True,
+        'filename': filename,
+        'ocr_available': ocr_ok,
+        'ocr_error': ocr_err,
+        'raw_text': raw_text[:2000] if raw_text else '',
+        'rows': rows,
+    })
+
+
+@app.route('/api/import_ledger_rows', methods=['POST'])
+@login_required
+def import_ledger_rows():
+    d = request.json or {}
+    rows = d.get('rows', [])
+    branch = d.get('branch', 'Şube 1')
+    photo_date = d.get('photo_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+
+    if not rows:
+        return jsonify({'error': 'İçe aktarılacak kayıt yok!'}), 400
+
+    conn = get_db_connection()
+    if is_day_closed(conn, photo_date, branch):
+        conn.close()
+        return jsonify({'error': 'Bu gün kapatıldığı için yeni kayıt eklenemez!'}), 400
+
+    imported = skipped = 0
+    errors = []
+    now_base = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    for i, row in enumerate(rows):
+        plate = (row.get('plate') or '').strip().upper()
+        wt = row.get('wash_type') or 'İç-Dış Yıkama'
+        pm = row.get('payment_method') or 'nakit'
+        price = row.get('price')
+        vc = row.get('vehicle_category') or 'otomobil'
+        if not plate or price in (None, '', 0):
+            errors.append(f'Satır {i + 1}: plaka veya tutar eksik')
+            continue
+        try:
+            price_f = float(price)
+        except (TypeError, ValueError):
+            errors.append(f'Satır {i + 1}: geçersiz tutar')
+            continue
+        if row.get('skip'):
+            skipped += 1
+            continue
+        paid_at = None if pm == 'bekliyor' else now_base
+        conn.execute(
+            'INSERT INTO vehicles (plate, wash_type, payment_method, price, created_at, brand_model, vehicle_category, branch, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (plate, wt, pm, price_f, now_base, '', vc, branch, paid_at),
+        )
+        imported += 1
+
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'imported': imported, 'skipped': skipped, 'errors': errors})
 
 
 # ── Dashboard Data ──

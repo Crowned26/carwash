@@ -861,3 +861,46 @@ img.zoomed {
     transition: all 0.2s;
 }
 .btn-pay:hover { opacity: 0.85; }
+
+/* Recent plates quick pick */
+.recent-plates-wrap {
+    margin-top: 10px;
+}
+
+.recent-plates-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.recent-plates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.btn-recent-plate {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--color-cc);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    min-height: 40px;
+    touch-action: manipulation;
+}
+
+.btn-recent-plate:hover {
+    background: rgba(59, 130, 246, 0.28);
+}
+
+.touch-device .btn-recent-plate {
+    min-height: 44px;
+    padding: 10px 14px;
+}

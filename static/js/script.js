@@ -119,7 +119,7 @@ window.quickDate = (type) => {
 };
 
 // Branch
-window.switchBranch = (b) => { currentBranch = b; localStorage.setItem('branch', b); restoreLastPayment(); updateRepeatButton(); refreshDashboard(); loadLedgerPhotos(); };
+window.switchBranch = (b) => { currentBranch = b; localStorage.setItem('branch', b); restoreLastPayment(); updateRepeatButton(); refreshDashboard(); loadLedgerPhotos(); loadRecentPlates(); };
 
 // Load Draft Reconciliation
 const loadSavedReconciliation = () => {
@@ -224,6 +224,37 @@ const applyLastVisit = (last) => {
     }
     updateSuggestedPrice();
 };
+const loadRecentPlates = async () => {
+    const wrap = document.getElementById('recent-plates-wrap');
+    const box = document.getElementById('recent-plates');
+    if (!wrap || !box) return;
+    try {
+        const r = await fetch(`/api/recent_plates?branch=${encodeURIComponent(currentBranch)}&limit=8`);
+        const d = await r.json();
+        if (!d.plates?.length) { wrap.style.display = 'none'; return; }
+        wrap.style.display = 'block';
+        const label = wrap.querySelector('.recent-plates-label');
+        if (label) label.textContent = t('Son Plakalar');
+        box.innerHTML = '';
+        d.plates.forEach(p => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-recent-plate';
+            btn.textContent = p.plate;
+            if (p.brand_model) btn.title = p.brand_model;
+            btn.onclick = () => pickRecentPlate(p.plate);
+            box.appendChild(btn);
+        });
+    } catch (e) {}
+};
+window.pickRecentPlate = (plate) => {
+    const el = document.getElementById('plate');
+    if (!el) return;
+    el.value = plate;
+    lookupPlate(plate.trim().toUpperCase());
+    el.focus();
+};
+
 const loadPlateSuggestions = async (q) => {
     const clean = q.replace(/\s/g, '');
     if(clean.length < 2) return;
@@ -431,7 +462,7 @@ document.getElementById('vehicle-form').addEventListener('submit', async(e)=>{
         if(r.ok){
             saveLastVehicle(payload);
             resetVehicleFormAfterSave(vd);
-            refreshDashboard();showToast(t('✅ Araç eklendi!'));
+            refreshDashboard();showToast(t('✅ Araç eklendi!')); loadRecentPlates();
         }
         else { const err=await r.json(); showToast(t(err.error)||t('Hata!'),'error'); }
     }catch(e){showToast(t('Hata!'),'error');}
@@ -537,12 +568,139 @@ window.submitEditVehicle=async()=>{const pl={plate:document.getElementById('edit
 window.submitEditExpense=async()=>{const pl={category:document.getElementById('edit-e-category').value,description:document.getElementById('edit-e-desc').value,amount:document.getElementById('edit-e-amount').value};
     try{const r=await fetch(`/api/edit_expense/${currentEditEId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pl)});if(r.ok){closeEditModal('expense');refreshDashboard();showToast(t('✏️ Güncellendi!'));}}catch(e){}};
 
-// Ledger Photo
-window.uploadLedger=async()=>{const fi=document.getElementById('ledger-photo');if(!fi.files.length){showToast(t('Fotoğraf seçin!'),'error');return;}
-    const fd=new FormData();fd.append('photo',fi.files[0]);fd.append('photo_date',filterDateInput.value||todayStr);fd.append('branch',currentBranch);
-    try{const r=await fetch('/api/upload_ledger',{method:'POST',body:fd});if(r.ok){fi.value='';showToast(t('📸 Fotoğraf yüklendi!'));loadLedgerPhotos();}else{const d=await r.json();showToast(t(d.error)||t('Başarısız!'),'error');}}catch(e){showToast(t('Hata!'),'error');}};
+// Ledger Photo + OCR import
+let ledgerImportRows = [];
+let ledgerImportFilename = '';
 
-const loadLedgerPhotos=async()=>{
+const washOptions = () => [
+    'İç Yıkama', 'Dış Yıkama', 'İç-Dış Yıkama', 'Motor Yıkama', 'Detaylı Temizlik', 'Pasta Cila'
+];
+const pmOptions = () => [
+    ['nakit', 'Nakit'], ['kk', 'Kart'], ['havale', 'Havale'], ['bekliyor', 'Sonra']
+];
+
+const renderLedgerImportTable = () => {
+    const body = document.getElementById('ledger-import-body');
+    if (!body) return;
+    body.innerHTML = '';
+    ledgerImportRows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        if (row.already_today) tr.style.background = 'rgba(245,158,11,0.08)';
+        const wtSel = washOptions().map(w => `<option value="${w}" ${row.wash_type === w ? 'selected' : ''}>${tWashType(w)}</option>`).join('');
+        const pmSel = pmOptions().map(([v, l]) => `<option value="${v}" ${row.payment_method === v ? 'selected' : ''}>${t(l)}</option>`).join('');
+        const skipChecked = row.skip ? 'checked' : '';
+        const dupBadge = row.already_today ? `<div style="font-size:10px;color:var(--color-pending);">${t('Bugün zaten var')}</div>` : '';
+        tr.innerHTML = `
+            <td><input type="text" data-f="plate" data-i="${idx}" value="${row.plate || ''}" style="width:110px;text-transform:uppercase;">${dupBadge}</td>
+            <td><input type="number" data-f="price" data-i="${idx}" value="${row.price || ''}" min="0" style="width:80px;"></td>
+            <td><select data-f="payment_method" data-i="${idx}" style="padding:6px;">${pmSel}</select></td>
+            <td><select data-f="wash_type" data-i="${idx}" style="padding:6px;max-width:140px;">${wtSel}</select></td>
+            <td style="text-align:center;"><input type="checkbox" data-f="skip" data-i="${idx}" ${skipChecked}></td>
+            <td><button type="button" class="btn-delete" style="padding:4px 8px;font-size:11px;" onclick="removeLedgerImportRow(${idx})">${t('Sil')}</button></td>`;
+        body.appendChild(tr);
+    });
+    body.querySelectorAll('input,select').forEach(el => {
+        el.addEventListener('change', () => {
+            const i = +el.dataset.i;
+            const f = el.dataset.f;
+            if (f === 'skip') ledgerImportRows[i][f] = el.checked;
+            else if (f === 'price') ledgerImportRows[i][f] = parseFloat(el.value) || 0;
+            else ledgerImportRows[i][f] = el.value;
+        });
+        if (el.dataset.f === 'plate') {
+            el.addEventListener('input', () => { ledgerImportRows[+el.dataset.i].plate = el.value.toUpperCase(); });
+        }
+    });
+    const cnt = document.getElementById('ledger-import-count');
+    if (cnt) cnt.textContent = `${ledgerImportRows.length} ${t('kayıt bulundu')}`;
+};
+
+window.addLedgerImportRow = () => {
+    ledgerImportRows.push({ plate: '', price: 0, payment_method: 'nakit', wash_type: 'İç-Dış Yıkama', skip: false, already_today: false });
+    renderLedgerImportTable();
+};
+window.removeLedgerImportRow = (idx) => {
+    ledgerImportRows.splice(idx, 1);
+    renderLedgerImportTable();
+};
+
+const openLedgerImportModal = (data) => {
+    ledgerImportFilename = data.filename || '';
+    ledgerImportRows = (data.rows || []).map(r => ({
+        ...r,
+        skip: !!r.already_today,
+    }));
+    const prev = document.getElementById('ledger-import-preview');
+    if (prev && ledgerImportFilename) prev.src = `/static/uploads/${ledgerImportFilename}`;
+    const warn = document.getElementById('ledger-import-warn');
+    if (warn) {
+        if (!data.ocr_available || data.ocr_error) {
+            warn.style.display = 'block';
+            warn.textContent = t(data.ocr_error) || t('Tesseract kurulu değil');
+        } else if (!ledgerImportRows.length) {
+            warn.style.display = 'block';
+            warn.textContent = t('Okunan kayıt yok. Satır ekleyebilir veya fotoğrafı yeniden çekebilirsin.');
+        } else warn.style.display = 'none';
+    }
+    renderLedgerImportTable();
+    document.getElementById('ledger-import-modal').style.display = 'flex';
+};
+window.closeLedgerImportModal = () => {
+    document.getElementById('ledger-import-modal').style.display = 'none';
+    ledgerImportRows = [];
+};
+
+window.scanLedger = async () => {
+    const fi = document.getElementById('ledger-photo');
+    if (!fi.files.length) { showToast(t('Fotoğraf seçin!'), 'error'); return; }
+    const fd = new FormData();
+    fd.append('photo', fi.files[0]);
+    fd.append('photo_date', filterDateInput.value || todayStr);
+    fd.append('branch', currentBranch);
+    try {
+        const r = await fetch('/api/scan_ledger', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (!r.ok) { showToast(t(d.error) || t('Başarısız!'), 'error'); return; }
+        fi.value = '';
+        loadLedgerPhotos();
+        openLedgerImportModal(d);
+    } catch (e) { showToast(t('Hata!'), 'error'); }
+};
+
+window.submitLedgerImport = async () => {
+    const body = document.getElementById('ledger-import-body');
+    body.querySelectorAll('input,select').forEach(el => {
+        const i = +el.dataset.i, f = el.dataset.f;
+        if (f === 'skip') ledgerImportRows[i][f] = el.checked;
+        else if (f === 'price') ledgerImportRows[i][f] = parseFloat(el.value) || 0;
+        else ledgerImportRows[i][f] = el.value;
+    });
+    const toSend = ledgerImportRows.filter(r => !r.skip && r.plate && r.price);
+    if (!toSend.length) { showToast(t('İçe aktarılacak kayıt yok!'), 'error'); return; }
+    if (!confirm(t('Okunan kayıtları sisteme eklemek istediğinize emin misiniz?'))) return;
+    try {
+        const r = await fetch('/api/import_ledger_rows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rows: ledgerImportRows,
+                branch: currentBranch,
+                photo_date: filterDateInput.value || todayStr,
+            }),
+        });
+        const d = await r.json();
+        if (!r.ok) { showToast(t(d.error) || t('Hata!'), 'error'); return; }
+        closeLedgerImportModal();
+        refreshDashboard();
+        loadRecentPlates();
+        showToast(`✅ ${d.imported} ${t('kayıt içe aktarıldı!')}`);
+        if (ledgerImportFilename) openLedgerCompare(ledgerImportFilename);
+    } catch (e) { showToast(t('Hata!'), 'error'); }
+};
+
+window.uploadLedger = window.scanLedger;
+
+const loadLedgerPhotos = async () => {
     try{const r=await fetch(`/api/get_ledger_photos?date=${filterDateInput.value||todayStr}&branch=${encodeURIComponent(currentBranch)}`);const d=await r.json();
         const c=document.getElementById('ledger-photos-container');c.innerHTML='';
         d.photos.forEach(p=>{const div=document.createElement('div');div.style.cssText='display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);';
@@ -572,7 +730,7 @@ window.zoomLedger=(src)=>{document.getElementById('zoom-img').src=src;document.g
 window.deleteLedger=async(id)=>{if(confirm(t('Fotoğrafı silmek istediğinize emin misiniz?'))){try{const r=await fetch(`/api/delete_ledger/${id}`,{method:'DELETE'});if(r.ok){showToast(t('🗑️ Silindi!'),'error');loadLedgerPhotos();closeLedgerCompare();}}catch(e){}}};
 
 // Init
-loadSettings().then(() => { restoreLastPayment(); updateRepeatButton(); });
+loadSettings().then(() => { restoreLastPayment(); updateRepeatButton(); loadRecentPlates(); });
 setFormDates();
 refreshDashboard();
 loadLedgerPhotos();
