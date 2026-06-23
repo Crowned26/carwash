@@ -904,3 +904,109 @@ img.zoomed {
     min-height: 44px;
     padding: 10px 14px;
 }
+
+/* Turbo mode */
+.vehicle-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.vehicle-panel-header h2 {
+    margin: 0;
+}
+
+.btn-turbo {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 40px;
+    white-space: nowrap;
+}
+
+.btn-turbo.active {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #111827;
+    border-color: transparent;
+}
+
+.turbo-bar {
+    margin-bottom: 14px;
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.turbo-cat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.btn-turbo-cat {
+    padding: 14px 10px;
+    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    background: rgba(15, 23, 42, 0.5);
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    min-height: 52px;
+}
+
+.btn-turbo-cat.active {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.turbo-summary {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fbbf24;
+    margin-bottom: 8px;
+}
+
+.turbo-hint {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+}
+
+.btn-turbo-link {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--color-cc);
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.turbo-active .turbo-plate-group input#plate {
+    font-size: 22px;
+    padding: 16px;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.turbo-active #btn-vehicle-submit {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    font-size: 18px;
+    padding: 16px;
+}

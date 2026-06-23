@@ -15,6 +15,80 @@ let cashDiscount = 100;
 window.cashDiscount = cashDiscount;
 let plateTodayCount = 0;
 let suggestTimer;
+let turboMode = localStorage.getItem('turboMode') === '1';
+let turboDetailsOpen = false;
+
+const syncTurboUI = () => {
+    if (!turboMode) return;
+    const cat = document.querySelector('input[name="vehicle_category"]:checked')?.value || 'otomobil';
+    const pm = document.querySelector('input[name="payment_method"]:checked')?.value || 'nakit';
+    const wt = document.getElementById('wash-type')?.value || 'İç-Dış Yıkama';
+    const price = document.getElementById('price')?.value || '0';
+    document.getElementById('btn-turbo-otomobil')?.classList.toggle('active', cat === 'otomobil');
+    document.getElementById('btn-turbo-suv')?.classList.toggle('active', cat === 'suv');
+    const summary = document.getElementById('turbo-summary');
+    if (summary) {
+        summary.textContent = `${tWashType(wt)} · ${tPaymentPm(pm)} · ${formatCurrency(Number(price) || 0)}`;
+    }
+    const submit = document.getElementById('btn-vehicle-submit');
+    if (submit) submit.textContent = t('⚡ Kaydet');
+};
+
+const restoreTurboDefaults = () => {
+    const cat = localStorage.getItem(`turboCat_${currentBranch}`) || 'otomobil';
+    document.getElementById('wash-type').value = 'İç-Dış Yıkama';
+    document.getElementById(cat === 'suv' ? 'cat-suv' : 'cat-otomobil').checked = true;
+    restoreLastPayment();
+    updateSuggestedPrice();
+};
+
+const applyTurboLayout = () => {
+    const panel = document.getElementById('vehicle-panel');
+    const normal = document.getElementById('vehicle-form-normal');
+    const extra = document.getElementById('vehicle-form-extra');
+    const turboBar = document.getElementById('turbo-bar');
+    const btn = document.getElementById('btn-turbo-toggle');
+    const plate = document.getElementById('plate');
+    if (!panel) return;
+    panel.classList.toggle('turbo-active', turboMode);
+    if (normal) normal.style.display = turboMode ? 'none' : '';
+    if (turboBar) turboBar.style.display = turboMode ? 'block' : 'none';
+    if (btn) {
+        btn.classList.toggle('active', turboMode);
+        btn.textContent = turboMode ? t('⚡ Turbo Açık') : t('⚡ Turbo');
+    }
+    if (extra) extra.style.display = turboMode && !turboDetailsOpen ? 'none' : '';
+    const submit = document.getElementById('btn-vehicle-submit');
+    if (submit) submit.textContent = turboMode ? t('⚡ Kaydet') : t('Aracı Kaydet');
+    if (turboMode) {
+        restoreTurboDefaults();
+        syncTurboUI();
+        setTimeout(() => plate?.focus(), 50);
+    }
+};
+
+window.toggleTurboMode = () => {
+    turboMode = !turboMode;
+    turboDetailsOpen = false;
+    localStorage.setItem('turboMode', turboMode ? '1' : '0');
+    applyTurboLayout();
+    showToast(turboMode ? t('⚡ Turbo mod açık') : t('Normal forma döndün'));
+};
+
+window.setTurboCategory = (cat) => {
+    document.getElementById(cat === 'suv' ? 'cat-suv' : 'cat-otomobil').checked = true;
+    localStorage.setItem(`turboCat_${currentBranch}`, cat);
+    document.getElementById('wash-type').value = 'İç-Dış Yıkama';
+    updateSuggestedPrice();
+    syncTurboUI();
+    document.getElementById('plate')?.focus();
+};
+
+window.toggleTurboDetails = () => {
+    turboDetailsOpen = !turboDetailsOpen;
+    const extra = document.getElementById('vehicle-form-extra');
+    if (extra) extra.style.display = turboDetailsOpen ? '' : 'none';
+};
 
 const calcPrice = (listPrice, paymentMethod) => {
     const base = Number(listPrice) || 0;
@@ -31,6 +105,7 @@ const setPaymentMethod = (pm) => {
     p.setAttribute('required', 'true');
     updateSuggestedPrice();
     localStorage.setItem(`lastPayment_${currentBranch}`, pm);
+    syncTurboUI();
 };
 
 const restoreLastPayment = () => {
@@ -76,6 +151,19 @@ const saveLastVehicle = (payload) => {
 };
 
 const resetVehicleFormAfterSave = (vd) => {
+    if (turboMode) {
+        document.getElementById('vehicle-form').reset();
+        if (vd) document.getElementById('vehicle-date').value = vd.replace(' ', 'T').slice(0, 16);
+        turboDetailsOpen = false;
+        restoreTurboDefaults();
+        document.getElementById('plate').focus();
+        document.getElementById('loyalty-badge').innerText = '';
+        document.getElementById('duplicate-warning').style.display = 'none';
+        document.getElementById('plate-history-link').style.display = 'none';
+        plateTodayCount = 0;
+        applyTurboLayout();
+        return;
+    }
     const wash = document.getElementById('wash-type').value;
     const cat = document.querySelector('input[name="vehicle_category"]:checked').value;
     document.getElementById('vehicle-form').reset();
@@ -123,7 +211,7 @@ window.quickDate = (type) => {
 };
 
 // Branch
-window.switchBranch = (b) => { currentBranch = b; localStorage.setItem('branch', b); restoreLastPayment(); updateRepeatButton(); refreshDashboard(); loadLedgerPhotos(); loadRecentPlates(); };
+window.switchBranch = (b) => { currentBranch = b; localStorage.setItem('branch', b); restoreLastPayment(); updateRepeatButton(); refreshDashboard(); loadLedgerPhotos(); loadRecentPlates(); if (turboMode) restoreTurboDefaults(), syncTurboUI(); };
 
 // Load Draft Reconciliation
 const loadSavedReconciliation = () => {
@@ -221,12 +309,15 @@ const applyLastVisit = (last) => {
         const id = last.vehicle_category === 'suv' ? 'cat-suv' : 'cat-otomobil';
         const el = document.getElementById(id);
         if(el) el.checked = true;
+        if (turboMode) localStorage.setItem(`turboCat_${currentBranch}`, last.vehicle_category);
     }
     if(last.wash_type) {
         const sel = document.getElementById('wash-type');
         if([...sel.options].some(o => o.value === last.wash_type)) sel.value = last.wash_type;
     }
+    if (turboMode && last.payment_method) setPaymentMethod(last.payment_method);
     updateSuggestedPrice();
+    syncTurboUI();
 };
 const loadRecentPlates = async () => {
     const wrap = document.getElementById('recent-plates-wrap');
@@ -303,6 +394,7 @@ const updateSuggestedPrice = () => {
         if(pm === 'nakit') sp.innerText = tPriceHint(list, final, pm);
         else sp.innerText = tPriceHint(list, final, pm);
     } else { sp.innerText = ''; }
+    syncTurboUI();
 };
 document.getElementById('wash-type').addEventListener('change', updateSuggestedPrice);
 document.querySelectorAll('input[name="vehicle_category"]').forEach(r => r.addEventListener('change', updateSuggestedPrice));
@@ -404,7 +496,7 @@ document.addEventListener('keydown', (e) => {
         form.requestSubmit();
         return;
     }
-    if (!typingField) {
+    if (!typingField || (turboMode && e.target.id === 'plate')) {
         const map = { '1': 'nakit', '2': 'kk', '3': 'bekliyor', '4': 'havale' };
         if (map[e.key]) {
             e.preventDefault();
@@ -749,7 +841,7 @@ window.zoomLedger=(src)=>{document.getElementById('zoom-img').src=src;document.g
 window.deleteLedger=async(id)=>{if(confirm(t('Fotoğrafı silmek istediğinize emin misiniz?'))){try{const r=await fetch(`/api/delete_ledger/${id}`,{method:'DELETE'});if(r.ok){showToast(t('🗑️ Silindi!'),'error');loadLedgerPhotos();closeLedgerCompare();}}catch(e){}}};
 
 // Init
-loadSettings().then(() => { restoreLastPayment(); updateRepeatButton(); loadRecentPlates(); });
+loadSettings().then(() => { restoreLastPayment(); updateRepeatButton(); loadRecentPlates(); applyTurboLayout(); });
 setFormDates();
 refreshDashboard();
 loadLedgerPhotos();

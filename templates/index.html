@@ -54,18 +54,32 @@
         <div class="main-content">
             <div class="forms-column">
                 <!-- Add Vehicle -->
-                <div class="glass-panel">
-                    <h2>Araç Ekle</h2>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','otomobil','nakit')">🚗 İç-Dış Nakit</button>
-                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','otomobil','kk')">🚗 İç-Dış Kart</button>
-                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','suv','nakit')">🚙 SUV Nakit</button>
-                        <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','suv','kk')">🚙 SUV Kart</button>
+                <div class="glass-panel" id="vehicle-panel">
+                    <div class="vehicle-panel-header">
+                        <h2>Araç Ekle</h2>
+                        <button type="button" id="btn-turbo-toggle" class="btn-turbo" onclick="toggleTurboMode()">⚡ Turbo</button>
                     </div>
-                    <button type="button" id="btn-repeat-last" class="btn-edit" onclick="repeatLastCustomer()" style="display:none;width:100%;padding:10px;margin-bottom:12px;">↩ Son Kaydı Tekrarla</button>
-                    <p style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">⌨️ <span data-lang="1 Nakit · 2 Kart · 3 Sonra · 4 Havale · Enter Kaydet">1 Nakit · 2 Kart · 3 Sonra · 4 Havale · Enter Kaydet</span></p>
+                    <div id="turbo-bar" class="turbo-bar" style="display:none;">
+                        <div class="turbo-cat-row">
+                            <button type="button" id="btn-turbo-otomobil" class="btn-turbo-cat" onclick="setTurboCategory('otomobil')">🚗 Otomobil</button>
+                            <button type="button" id="btn-turbo-suv" class="btn-turbo-cat" onclick="setTurboCategory('suv')">🚙 SUV</button>
+                        </div>
+                        <div id="turbo-summary" class="turbo-summary">İç-Dış · Nakit · ₺0</div>
+                        <p class="turbo-hint">⌨️ <span data-lang="1 Nakit · 2 Kart · Enter Kaydet">1 Nakit · 2 Kart · Enter Kaydet</span></p>
+                        <button type="button" class="btn-turbo-link" onclick="toggleTurboDetails()">Özel işlem / fiyat değiştir</button>
+                    </div>
+                    <div id="vehicle-form-normal">
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                            <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','otomobil','nakit')">🚗 İç-Dış Nakit</button>
+                            <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','otomobil','kk')">🚗 İç-Dış Kart</button>
+                            <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','suv','nakit')">🚙 SUV Nakit</button>
+                            <button type="button" class="btn-date" onclick="applyPreset('İç-Dış Yıkama','suv','kk')">🚙 SUV Kart</button>
+                        </div>
+                        <button type="button" id="btn-repeat-last" class="btn-edit" onclick="repeatLastCustomer()" style="display:none;width:100%;padding:10px;margin-bottom:12px;">↩ Son Kaydı Tekrarla</button>
+                        <p style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">⌨️ <span data-lang="1 Nakit · 2 Kart · 3 Sonra · 4 Havale · Enter Kaydet">1 Nakit · 2 Kart · 3 Sonra · 4 Havale · Enter Kaydet</span></p>
+                    </div>
                     <form id="vehicle-form">
-                        <div class="form-group" style="display:flex; gap:10px;">
+                        <div class="form-group turbo-plate-group">
                             <div style="flex:1;">
                                 <label>Araç Plakası
                                     <span id="loyalty-badge" style="color: var(--color-pending); font-size: 12px; margin-left: 10px; font-weight: bold;"></span>
@@ -79,6 +93,9 @@
                                     <div id="recent-plates" class="recent-plates"></div>
                                 </div>
                             </div>
+                        </div>
+                        <div id="vehicle-form-extra">
+                        <div class="form-group" style="display:flex; gap:10px;">
                             <div style="flex:1;">
                                 <label>Tarih / Saat</label>
                                 <input type="datetime-local" id="vehicle-date" required style="width:100%; padding:12px; border-radius:8px; background:rgba(15,23,42,0.6); color:white; border:1px solid var(--border-color);">
@@ -125,7 +142,8 @@
                             <label>Fiyat (₺) <span id="suggested-price" style="color: var(--color-cash); font-size: 12px; margin-left: 10px;"></span></label>
                             <input type="number" id="price" placeholder="Örn: 250" required min="0">
                         </div>
-                        <button type="submit" class="btn-submit">Aracı Kaydet</button>
+                        </div>
+                        <button type="submit" class="btn-submit" id="btn-vehicle-submit">Aracı Kaydet</button>
                     </form>
                 </div>
                 <!-- Add Expense -->
@@ -368,6 +386,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}?v=19"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=21"></script>
 </body>
 </html>
