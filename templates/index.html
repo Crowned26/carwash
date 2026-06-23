@@ -101,6 +101,10 @@
                                     <div class="recent-plates-label">Son Plakalar</div>
                                     <div id="recent-plates" class="recent-plates"></div>
                                 </div>
+                                <div id="turbo-brand-wrap" class="turbo-brand-wrap" style="display:none;">
+                                    <label for="turbo-brand-model">Marka / Model <span class="turbo-brand-optional">(isteğe bağlı)</span></label>
+                                    <input type="text" id="turbo-brand-model" placeholder="Örn: Ibiza, Tesla" autocomplete="off">
+                                </div>
                             </div>
                         </div>
                         <div id="vehicle-form-extra">
@@ -395,6 +399,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}?v=24"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=25"></script>
 </body>
 </html>

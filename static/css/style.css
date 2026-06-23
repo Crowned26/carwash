@@ -1057,3 +1057,30 @@ img.zoomed {
     font-size: 18px;
     padding: 16px;
 }
+
+.turbo-brand-wrap {
+    margin-top: 12px;
+}
+
+.turbo-brand-wrap label {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+}
+
+.turbo-brand-optional {
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.85;
+}
+
+.turbo-brand-wrap input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.6);
+    color: white;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    font-size: 16px;
+}

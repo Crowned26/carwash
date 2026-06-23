@@ -17,6 +17,7 @@ let plateTodayCount = 0;
 let suggestTimer;
 let turboMode = localStorage.getItem('turboMode') === '1';
 let turboDetailsOpen = false;
+let plateIsNewCustomer = false;
 
 const syncTurboUI = () => {
     if (!turboMode) return;
@@ -107,6 +108,23 @@ const focusPlateInput = () => {
     document.getElementById('plate')?.focus();
 };
 
+const updateTurboBrandField = (isNew) => {
+    const wrap = document.getElementById('turbo-brand-wrap');
+    if (!wrap) return;
+    const show = turboMode && plateIsNewCustomer && !turboDetailsOpen;
+    wrap.style.display = show ? 'block' : 'none';
+    if (!show) {
+        const turboBrand = document.getElementById('turbo-brand-model');
+        if (turboBrand) turboBrand.value = '';
+    }
+};
+
+const syncTurboBrandToForm = () => {
+    const turboBrand = document.getElementById('turbo-brand-model');
+    const brand = document.getElementById('brand-model');
+    if (turboBrand && brand) brand.value = turboBrand.value;
+};
+
 const formatPlateValue = (raw) => {
     const clean = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const m = clean.match(/^(\d{0,2})([A-Z]{0,3})(\d{0,4})/);
@@ -118,6 +136,8 @@ window.toggleTurboDetails = () => {
     turboDetailsOpen = !turboDetailsOpen;
     const extra = document.getElementById('vehicle-form-extra');
     if (extra) extra.style.display = turboDetailsOpen ? '' : 'none';
+    if (!turboDetailsOpen && plateIsNewCustomer) updateTurboBrandField(true);
+    else if (turboDetailsOpen) updateTurboBrandField(false);
 };
 
 const calcPrice = (listPrice, paymentMethod) => {
@@ -190,7 +210,10 @@ const resetVehicleFormAfterSave = (vd) => {
         document.getElementById('loyalty-badge').innerText = '';
         document.getElementById('duplicate-warning').style.display = 'none';
         document.getElementById('plate-history-link').style.display = 'none';
+        document.getElementById('brand-model').value = '';
+        updateTurboBrandField(false);
         plateTodayCount = 0;
+        plateIsNewCustomer = false;
         applyTurboLayout();
         return;
     }
@@ -402,13 +425,17 @@ const lookupPlate = async (plate) => {
         const r = await fetch(`/api/check_plate?plate=${encodeURIComponent(plate)}&branch=${encodeURIComponent(currentBranch)}&date=${recordDate}`);
         const d = await r.json();
         plateTodayCount = d.today_count || 0;
+        plateIsNewCustomer = d.count === 0;
         if(d.count > 0) {
             badge.innerText = d.count > 0 ? tVisit(d.count + 1) : t('🌟 Yeni Müşteri');
             histLink.style.display = 'inline';
             applyLastVisit(d.last);
+            updateTurboBrandField(false);
         } else {
             badge.innerText = t('🌟 Yeni Müşteri');
             histLink.style.display = 'none';
+            document.getElementById('brand-model').value = '';
+            updateTurboBrandField(true);
         }
         dup.style.display = plateTodayCount > 0 ? 'block' : 'none';
     } catch(e) {}
@@ -558,6 +585,8 @@ plateInput.addEventListener('input', (e) => {
     document.getElementById('duplicate-warning').style.display = 'none';
     document.getElementById('plate-history-link').style.display = 'none';
     plateTodayCount = 0;
+    plateIsNewCustomer = false;
+    updateTurboBrandField(false);
     const p = plateInput.value.trim().toUpperCase();
     clearTimeout(suggestTimer);
     if(p.length >= 2) suggestTimer = setTimeout(() => loadPlateSuggestions(p), 300);
@@ -566,7 +595,12 @@ plateInput.addEventListener('input', (e) => {
 plateInput.addEventListener('change', () => {
     const p = plateInput.value.trim().toUpperCase();
     if(p.length >= 5) lookupPlate(p);
+    else updateTurboBrandField(false);
 });
+}
+const turboBrandInput = document.getElementById('turbo-brand-model');
+if (turboBrandInput) {
+    turboBrandInput.addEventListener('input', syncTurboBrandToForm);
 }
 document.getElementById('vehicle-date')?.addEventListener('change', () => {
     if (!plateInput) return;
@@ -589,6 +623,7 @@ document.getElementById('real-cc').addEventListener('input', (e) => {
 // Add vehicle
 document.getElementById('vehicle-form').addEventListener('submit', async(e)=>{
     e.preventDefault();
+    syncTurboBrandToForm();
     const plateVal = document.getElementById('plate').value.toUpperCase();
     if(!plateVal) { showToast(t('Plaka girin!'), 'error'); return; }
     if(plateTodayCount > 0 && !confirm(t('Bu plaka bugün zaten kayıtlı. Yine de eklemek istiyor musunuz?'))) return;

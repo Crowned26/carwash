@@ -35,6 +35,7 @@ const dictionary = {
     "Özel işlem / fiyat değiştir": "Special service / change price",
     "1 Nakit · 2 Kart · Enter Kaydet": "1 Cash · 2 Card · Enter Save",
     "Nakit/Kart seç, plaka yaz, Kaydet": "Pick Cash/Card, enter plate, Save",
+    "(isteğe bağlı)": "(optional)",
     "Gider Ekle": "Add Expense",
     "Kategori": "Category",
     "Açıklama": "Description",
