@@ -1,7 +1,7 @@
 let priceConfig = {
     'İç-Dış Yıkama': { otomobil: 900, suv: 1000 },
     'İç Yıkama': { otomobil: 500, suv: 600 },
-    'Dış Yıkama': { otomobil: 400, suv: 500 },
+    'Dış Yıkama': { otomobil: 700, suv: 800 },
     'Motor Yıkama': { otomobil: 300, suv: 350 },
     'Detaylı Temizlik': { otomobil: 1500, suv: 1800 },
     'Pasta Cila': { otomobil: 2000, suv: 2500 }
@@ -28,6 +28,8 @@ const syncTurboUI = () => {
     document.getElementById('btn-turbo-suv')?.classList.toggle('active', cat === 'suv');
     document.getElementById('btn-turbo-nakit')?.classList.toggle('active', pm === 'nakit');
     document.getElementById('btn-turbo-kart')?.classList.toggle('active', pm === 'kk');
+    document.getElementById('btn-turbo-icdis')?.classList.toggle('active', wt === 'İç-Dış Yıkama');
+    document.getElementById('btn-turbo-dis')?.classList.toggle('active', wt === 'Dış Yıkama');
     const summary = document.getElementById('turbo-summary');
     if (summary) {
         summary.textContent = `${tWashType(wt)} · ${tPaymentPm(pm)} · ${formatCurrency(Number(price) || 0)}`;
@@ -38,7 +40,8 @@ const syncTurboUI = () => {
 
 const restoreTurboDefaults = () => {
     const cat = localStorage.getItem(`turboCat_${currentBranch}`) || 'otomobil';
-    document.getElementById('wash-type').value = 'İç-Dış Yıkama';
+    const wash = localStorage.getItem(`turboWash_${currentBranch}`) || 'İç-Dış Yıkama';
+    document.getElementById('wash-type').value = wash;
     document.getElementById(cat === 'suv' ? 'cat-suv' : 'cat-otomobil').checked = true;
     restoreLastPayment();
     updateSuggestedPrice();
@@ -80,7 +83,14 @@ window.toggleTurboMode = () => {
 window.setTurboCategory = (cat) => {
     document.getElementById(cat === 'suv' ? 'cat-suv' : 'cat-otomobil').checked = true;
     localStorage.setItem(`turboCat_${currentBranch}`, cat);
-    document.getElementById('wash-type').value = 'İç-Dış Yıkama';
+    updateSuggestedPrice();
+    syncTurboUI();
+    focusPlateInput();
+};
+
+window.setTurboWashType = (wash) => {
+    document.getElementById('wash-type').value = wash;
+    localStorage.setItem(`turboWash_${currentBranch}`, wash);
     updateSuggestedPrice();
     syncTurboUI();
     focusPlateInput();
@@ -334,6 +344,9 @@ const applyLastVisit = (last) => {
     if(last.wash_type) {
         const sel = document.getElementById('wash-type');
         if([...sel.options].some(o => o.value === last.wash_type)) sel.value = last.wash_type;
+        if (turboMode && (last.wash_type === 'İç-Dış Yıkama' || last.wash_type === 'Dış Yıkama')) {
+            localStorage.setItem(`turboWash_${currentBranch}`, last.wash_type);
+        }
     }
     if (turboMode && last.payment_method) setPaymentMethod(last.payment_method);
     updateSuggestedPrice();

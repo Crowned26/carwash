@@ -945,14 +945,16 @@ img.zoomed {
     border: 1px solid rgba(251, 191, 36, 0.25);
 }
 
-.turbo-cat-row {
+.turbo-cat-row,
+.turbo-wash-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     margin-bottom: 12px;
 }
 
-.btn-turbo-cat {
+.btn-turbo-cat,
+.btn-turbo-wash {
     padding: 14px 10px;
     border-radius: 12px;
     border: 2px solid var(--border-color);
@@ -964,7 +966,8 @@ img.zoomed {
     min-height: 52px;
 }
 
-.btn-turbo-cat.active {
+.btn-turbo-cat.active,
+.btn-turbo-wash.active {
     border-color: #f59e0b;
     background: rgba(245, 158, 11, 0.2);
     color: #fbbf24;

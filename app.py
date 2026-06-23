@@ -20,7 +20,7 @@ INVALID_FILE_MSG = 'Geçersiz dosya tipi! (png, jpg, gif, webp, heic)'
 DEFAULT_PRICES = {
     'İç-Dış Yıkama': {'otomobil': 900, 'suv': 1000},
     'İç Yıkama': {'otomobil': 500, 'suv': 600},
-    'Dış Yıkama': {'otomobil': 400, 'suv': 500},
+    'Dış Yıkama': {'otomobil': 700, 'suv': 800},
     'Motor Yıkama': {'otomobil': 300, 'suv': 350},
     'Detaylı Temizlik': {'otomobil': 1500, 'suv': 1800},
     'Pasta Cila': {'otomobil': 2000, 'suv': 2500},

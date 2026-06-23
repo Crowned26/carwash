@@ -64,6 +64,10 @@
                             <button type="button" id="btn-turbo-otomobil" class="btn-turbo-cat" onclick="setTurboCategory('otomobil')">🚗 Otomobil</button>
                             <button type="button" id="btn-turbo-suv" class="btn-turbo-cat" onclick="setTurboCategory('suv')">🚙 SUV</button>
                         </div>
+                        <div class="turbo-wash-row">
+                            <button type="button" id="btn-turbo-icdis" class="btn-turbo-wash" onclick="setTurboWashType('İç-Dış Yıkama')">🫧 İç-Dış</button>
+                            <button type="button" id="btn-turbo-dis" class="btn-turbo-wash" onclick="setTurboWashType('Dış Yıkama')">💦 Dış</button>
+                        </div>
                         <div class="turbo-pay-row">
                             <button type="button" id="btn-turbo-nakit" class="btn-turbo-pay nakit" onclick="setTurboPayment('nakit')">💵 Nakit</button>
                             <button type="button" id="btn-turbo-kart" class="btn-turbo-pay kk" onclick="setTurboPayment('kk')">💳 Kart</button>
@@ -391,6 +395,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}?v=23"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=24"></script>
 </body>
 </html>
