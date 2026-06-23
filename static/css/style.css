@@ -970,6 +970,50 @@ img.zoomed {
     color: #fbbf24;
 }
 
+.turbo-pay-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.btn-turbo-pay {
+    padding: 14px 10px;
+    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    background: rgba(15, 23, 42, 0.5);
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    min-height: 52px;
+    touch-action: manipulation;
+}
+
+.btn-turbo-pay.nakit.active {
+    border-color: var(--color-cash);
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--color-cash);
+}
+
+.btn-turbo-pay.kk.active {
+    border-color: var(--color-cc);
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--color-cc);
+}
+
+.turbo-hint-touch {
+    display: none;
+}
+
+.touch-device .turbo-hint-keyboard {
+    display: none;
+}
+
+.touch-device .turbo-hint-touch {
+    display: block;
+}
+
 .turbo-summary {
     text-align: center;
     font-size: 18px;

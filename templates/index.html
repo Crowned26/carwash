@@ -64,8 +64,13 @@
                             <button type="button" id="btn-turbo-otomobil" class="btn-turbo-cat" onclick="setTurboCategory('otomobil')">🚗 Otomobil</button>
                             <button type="button" id="btn-turbo-suv" class="btn-turbo-cat" onclick="setTurboCategory('suv')">🚙 SUV</button>
                         </div>
+                        <div class="turbo-pay-row">
+                            <button type="button" id="btn-turbo-nakit" class="btn-turbo-pay nakit" onclick="setTurboPayment('nakit')">💵 Nakit</button>
+                            <button type="button" id="btn-turbo-kart" class="btn-turbo-pay kk" onclick="setTurboPayment('kk')">💳 Kart</button>
+                        </div>
                         <div id="turbo-summary" class="turbo-summary">İç-Dış · Nakit · ₺0</div>
-                        <p class="turbo-hint">⌨️ <span data-lang="1 Nakit · 2 Kart · Enter Kaydet">1 Nakit · 2 Kart · Enter Kaydet</span></p>
+                        <p class="turbo-hint turbo-hint-keyboard">⌨️ <span data-lang="1 Nakit · 2 Kart · Enter Kaydet">1 Nakit · 2 Kart · Enter Kaydet</span></p>
+                        <p class="turbo-hint turbo-hint-touch">👆 <span data-lang="Nakit/Kart seç, plaka yaz, Kaydet">Nakit/Kart seç, plaka yaz, Kaydet</span></p>
                         <button type="button" class="btn-turbo-link" onclick="toggleTurboDetails()">Özel işlem / fiyat değiştir</button>
                     </div>
                     <div id="vehicle-form-normal">
@@ -386,6 +391,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}?v=21"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=22"></script>
 </body>
 </html>

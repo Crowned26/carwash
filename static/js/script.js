@@ -26,6 +26,8 @@ const syncTurboUI = () => {
     const price = document.getElementById('price')?.value || '0';
     document.getElementById('btn-turbo-otomobil')?.classList.toggle('active', cat === 'otomobil');
     document.getElementById('btn-turbo-suv')?.classList.toggle('active', cat === 'suv');
+    document.getElementById('btn-turbo-nakit')?.classList.toggle('active', pm === 'nakit');
+    document.getElementById('btn-turbo-kart')?.classList.toggle('active', pm === 'kk');
     const summary = document.getElementById('turbo-summary');
     if (summary) {
         summary.textContent = `${tWashType(wt)} · ${tPaymentPm(pm)} · ${formatCurrency(Number(price) || 0)}`;
@@ -80,6 +82,12 @@ window.setTurboCategory = (cat) => {
     localStorage.setItem(`turboCat_${currentBranch}`, cat);
     document.getElementById('wash-type').value = 'İç-Dış Yıkama';
     updateSuggestedPrice();
+    syncTurboUI();
+    document.getElementById('plate')?.focus();
+};
+
+window.setTurboPayment = (pm) => {
+    setPaymentMethod(pm);
     syncTurboUI();
     document.getElementById('plate')?.focus();
 };
