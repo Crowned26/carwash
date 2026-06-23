@@ -65,7 +65,7 @@ const applyTurboLayout = () => {
     if (turboMode) {
         restoreTurboDefaults();
         syncTurboUI();
-        setTimeout(() => plate?.focus(), 50);
+        setTimeout(() => focusPlateInput(), 50);
     }
 };
 
@@ -83,13 +83,25 @@ window.setTurboCategory = (cat) => {
     document.getElementById('wash-type').value = 'İç-Dış Yıkama';
     updateSuggestedPrice();
     syncTurboUI();
-    document.getElementById('plate')?.focus();
+    focusPlateInput();
 };
 
 window.setTurboPayment = (pm) => {
     setPaymentMethod(pm);
     syncTurboUI();
+    focusPlateInput();
+};
+
+const focusPlateInput = () => {
+    if (document.body.classList.contains('touch-device')) return;
     document.getElementById('plate')?.focus();
+};
+
+const formatPlateValue = (raw) => {
+    const clean = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const m = clean.match(/^(\d{0,2})([A-Z]{0,3})(\d{0,4})/);
+    if (!m) return clean;
+    return [m[1], m[2], m[3]].filter(Boolean).join(' ');
 };
 
 window.toggleTurboDetails = () => {
@@ -164,7 +176,7 @@ const resetVehicleFormAfterSave = (vd) => {
         if (vd) document.getElementById('vehicle-date').value = vd.replace(' ', 'T').slice(0, 16);
         turboDetailsOpen = false;
         restoreTurboDefaults();
-        document.getElementById('plate').focus();
+        focusPlateInput();
         document.getElementById('loyalty-badge').innerText = '';
         document.getElementById('duplicate-warning').style.display = 'none';
         document.getElementById('plate-history-link').style.display = 'none';
@@ -504,7 +516,7 @@ document.addEventListener('keydown', (e) => {
         form.requestSubmit();
         return;
     }
-    if (!typingField || (turboMode && e.target.id === 'plate')) {
+    if (!typingField) {
         const map = { '1': 'nakit', '2': 'kk', '3': 'bekliyor', '4': 'havale' };
         if (map[e.key]) {
             e.preventDefault();
@@ -517,9 +529,16 @@ document.addEventListener('keydown', (e) => {
 const plateInput = document.getElementById('plate'); let typingTimer;
 if (plateInput) {
 plateInput.addEventListener('input', (e) => {
-    let p_format = e.target.value.replace(/\s/g, '').toUpperCase();
-    const m = p_format.match(/^([0-9]{2})([A-Z]{1,3})([0-9]{0,4})$/);
-    e.target.value = m ? `${m[1]}${m[2] ? " "+m[2] : ""}${m[3] ? " "+m[3] : ""}` : p_format;
+    const input = e.target;
+    const pos = input.selectionStart ?? input.value.length;
+    const before = input.value;
+    const formatted = formatPlateValue(before);
+    if (formatted !== before) {
+        input.value = formatted;
+        const diff = formatted.length - before.length;
+        const next = Math.max(0, Math.min(formatted.length, pos + diff));
+        try { input.setSelectionRange(next, next); } catch (err) {}
+    }
 
     clearTimeout(typingTimer);
     document.getElementById('loyalty-badge').innerText = '';
