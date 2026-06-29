@@ -1084,3 +1084,87 @@ img.zoomed {
     border: 1px solid rgba(251, 191, 36, 0.35);
     font-size: 16px;
 }
+
+.summary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: -8px 0 16px;
+    padding: 0 4px;
+}
+
+.summary-count-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.bulk-paste-text {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.6);
+    color: white;
+    border: 1px solid var(--border-color);
+    font-family: ui-monospace, monospace;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 100px;
+}
+
+.day-close-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 12px;
+}
+
+.turbo-loyalty {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.turbo-loyalty-new {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.turbo-loyalty-return {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.pwa-install-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(37, 99, 235, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.pwa-install-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.pwa-install-text strong {
+    color: #93c5fd;
+}
+
+.pwa-install-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}

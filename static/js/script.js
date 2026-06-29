@@ -11,6 +11,7 @@ const formatTime = (d) => new Date(d).toLocaleTimeString(getLocale(),{hour:'2-di
 let currentBranch = localStorage.getItem('branch') || 'Şube 1';
 let currentSystemData = { remaining_cash:0, total_cc:0 };
 let cachedVehicles = [];
+let lastSummaryData = null;
 let cashDiscount = 100;
 window.cashDiscount = cashDiscount;
 let plateTodayCount = 0;
@@ -132,6 +133,60 @@ const formatPlateValue = (raw) => {
     return [m[1], m[2], m[3]].filter(Boolean).join(' ');
 };
 
+const updateLoyaltyDisplay = (visitCount, isNew) => {
+    const badge = document.getElementById('loyalty-badge');
+    const turboLoyalty = document.getElementById('turbo-loyalty');
+    if (isNew || visitCount === 0) {
+        if (badge) badge.innerText = t('🌟 Yeni Müşteri');
+        if (turboLoyalty) {
+            turboLoyalty.style.display = turboMode ? 'block' : 'none';
+            turboLoyalty.className = 'turbo-loyalty turbo-loyalty-new';
+            turboLoyalty.textContent = t('🌟 Yeni müşteri');
+        }
+    } else {
+        const n = visitCount + 1;
+        if (badge) badge.innerText = tVisit(n);
+        if (turboLoyalty && turboMode) {
+            turboLoyalty.style.display = 'block';
+            turboLoyalty.className = 'turbo-loyalty turbo-loyalty-return';
+            turboLoyalty.textContent = `⭐ ${n}. ${t('yıkama')} — ${t('sadık müşteri')}`;
+        } else if (turboLoyalty) {
+            turboLoyalty.style.display = 'none';
+        }
+    }
+};
+
+const updateSystemVehicleCount = (n) => {
+    ['system-vehicle-count', 'system-vehicle-count-2'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(n);
+    });
+};
+
+const fmtTlPlain = (n) => `${Math.round(Number(n) || 0)} TL`;
+
+window.copyDaySummary = async () => {
+    if (!lastSummaryData) { showToast(t('Veri yükleniyor, tekrar dene.'), 'error'); return; }
+    const d = filterDateInput.value || todayStr;
+    const s = lastSummaryData;
+    const text = [
+        `WashTrack — ${d}`,
+        `${t('Araç')}: ${cachedVehicles.length}`,
+        `${t('Nakit Toplam')}: ${fmtTlPlain(s.total_cash)}`,
+        `${t('Kredi Kartı')}: ${fmtTlPlain(s.total_cc)}`,
+        `${t('Havale')}: ${fmtTlPlain(s.total_havale)}`,
+        `${t('Toplam Ciro')}: ${fmtTlPlain(s.total_revenue)}`,
+        `${t('Giderler')}: ${fmtTlPlain(s.total_expenses)}`,
+        `${t('Kalan Nakit')}: ${fmtTlPlain(s.remaining_cash)}`,
+    ].join('\n');
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast(t('📋 Gün özeti panoya kopyalandı!'));
+    } catch (e) {
+        showToast(t('Kopyalama başarısız'), 'error');
+    }
+};
+
 window.toggleTurboDetails = () => {
     turboDetailsOpen = !turboDetailsOpen;
     const extra = document.getElementById('vehicle-form-extra');
@@ -228,6 +283,8 @@ const resetVehicleFormAfterSave = (vd) => {
     document.getElementById('loyalty-badge').innerText = '';
     document.getElementById('duplicate-warning').style.display = 'none';
     document.getElementById('plate-history-link').style.display = 'none';
+    const turboLoyalty = document.getElementById('turbo-loyalty');
+    if (turboLoyalty) turboLoyalty.style.display = 'none';
     plateTodayCount = 0;
     setTimeout(updateSuggestedPrice, 50);
 };
@@ -427,15 +484,15 @@ const lookupPlate = async (plate) => {
         plateTodayCount = d.today_count || 0;
         plateIsNewCustomer = d.count === 0;
         if(d.count > 0) {
-            badge.innerText = d.count > 0 ? tVisit(d.count + 1) : t('🌟 Yeni Müşteri');
             histLink.style.display = 'inline';
             applyLastVisit(d.last);
             updateTurboBrandField(false);
+            updateLoyaltyDisplay(d.count, false);
         } else {
-            badge.innerText = t('🌟 Yeni Müşteri');
             histLink.style.display = 'none';
             document.getElementById('brand-model').value = '';
             updateTurboBrandField(true);
+            updateLoyaltyDisplay(0, true);
         }
         dup.style.display = plateTodayCount > 0 ? 'block' : 'none';
     } catch(e) {}
@@ -470,6 +527,8 @@ const refreshDashboard = async () => {
         const res = await fetch(`/api/dashboard_data?date=${selectedDate}&branch=${encodeURIComponent(currentBranch)}`);
         const data = await res.json();
         cachedVehicles = data.vehicles;
+        lastSummaryData = data.summary;
+        updateSystemVehicleCount(data.vehicles.length);
         document.getElementById('val-total-rev').innerText = formatCurrency(data.summary.total_revenue);
         document.getElementById('val-total-cash').innerText = formatCurrency(data.summary.total_cash);
         document.getElementById('val-total-cc').innerText = formatCurrency(data.summary.total_cc);
@@ -584,6 +643,8 @@ plateInput.addEventListener('input', (e) => {
     document.getElementById('loyalty-badge').innerText = '';
     document.getElementById('duplicate-warning').style.display = 'none';
     document.getElementById('plate-history-link').style.display = 'none';
+    const turboLoyalty = document.getElementById('turbo-loyalty');
+    if (turboLoyalty) turboLoyalty.style.display = 'none';
     plateTodayCount = 0;
     plateIsNewCustomer = false;
     updateTurboBrandField(false);
@@ -679,6 +740,17 @@ window.calculateReconciliation = () => {
 };
 
 window.closeDay = async () => {
+    const sysCount = cachedVehicles.length;
+    const defterEl = document.getElementById('defter-vehicle-count');
+    const defterRaw = defterEl ? defterEl.value.trim() : '';
+    if (defterRaw !== '') {
+        const defterCount = parseInt(defterRaw, 10);
+        if (!Number.isNaN(defterCount) && defterCount !== sysCount) {
+            const msg = t('Uyarı: Sistemde {sys} araç, defterde {defter} yazdın. Yine de günü kapatmak istiyor musun?')
+                .replace('{sys}', sysCount).replace('{defter}', defterCount);
+            if (!confirm(msg)) return;
+        }
+    }
     if(!confirm(t('DİKKAT! Bu günü kapattığınızda artık bu tarihe geçmişe dönük işlem (Ekleme/Silme/Düzenleme) yapamayacaksınız. Onaylıyor musunuz?'))) return;
     try {
         const d = filterDateInput.value || todayStr;
@@ -804,24 +876,62 @@ const openLedgerImportModal = (data) => {
         ...r,
         skip: !!r.already_today,
     }));
+    const title = document.getElementById('ledger-import-title');
+    if (title) title.textContent = data.source === 'bulk' ? t('📋 Toplu Yapıştır — Onayla') : t('📋 Defter Okuma — Onayla');
     const prev = document.getElementById('ledger-import-preview');
-    if (prev && ledgerImportFilename) prev.src = `/static/uploads/${ledgerImportFilename}`;
+    if (prev) {
+        if (ledgerImportFilename) {
+            prev.src = `/static/uploads/${ledgerImportFilename}`;
+            prev.style.display = '';
+        } else {
+            prev.removeAttribute('src');
+            prev.style.display = 'none';
+        }
+    }
     const warn = document.getElementById('ledger-import-warn');
     if (warn) {
-        if (!data.ocr_available || data.ocr_error) {
+        if (data.source !== 'bulk' && (!data.ocr_available || data.ocr_error)) {
             warn.style.display = 'block';
             warn.textContent = t(data.ocr_error) || t('Tesseract kurulu değil');
         } else if (!ledgerImportRows.length) {
             warn.style.display = 'block';
-            warn.textContent = t('Okunan kayıt yok. Satır ekleyebilir veya fotoğrafı yeniden çekebilirsin.');
+            warn.textContent = data.source === 'bulk'
+                ? t('Satır okunamadı. Her satırda plaka ve tutar olsun.')
+                : t('Okunan kayıt yok. Satır ekleyebilir veya fotoğrafı yeniden çekebilirsin.');
         } else warn.style.display = 'none';
     }
+    if (!ledgerImportRows.length) addLedgerImportRow();
     renderLedgerImportTable();
     document.getElementById('ledger-import-modal').style.display = 'flex';
 };
 window.closeLedgerImportModal = () => {
     document.getElementById('ledger-import-modal').style.display = 'none';
     ledgerImportRows = [];
+    const prev = document.getElementById('ledger-import-preview');
+    if (prev) prev.style.display = '';
+};
+
+window.scanBulkPaste = async () => {
+    const ta = document.getElementById('bulk-paste-text');
+    const text = ta ? ta.value.trim() : '';
+    if (!text) { showToast(t('Yapıştırılacak metin yok!'), 'error'); return; }
+    try {
+        const r = await fetch('/api/parse_bulk_paste', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text,
+                branch: currentBranch,
+                photo_date: filterDateInput.value || todayStr,
+            }),
+        });
+        const d = await r.json();
+        if (!r.ok) { showToast(t(d.error) || t('Hata!'), 'error'); return; }
+        openLedgerImportModal({ ...d, source: 'bulk' });
+        if (ta) ta.value = '';
+    } catch (e) {
+        showToast(t('Hata!'), 'error');
+    }
 };
 
 window.scanLedger = async () => {

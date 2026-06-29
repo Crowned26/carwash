@@ -7,6 +7,16 @@
 </head>
 <body>
     <div class="app-container">
+        <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;">
+            <div class="pwa-install-text">
+                <strong>📲 Ana Ekrana Ekle</strong>
+                <span id="pwa-install-hint"></span>
+            </div>
+            <div class="pwa-install-actions">
+                <button type="button" id="btn-pwa-install" class="btn-submit" onclick="installPwa()" style="width:auto;padding:8px 14px;margin:0;font-size:13px;">Yükle</button>
+                <button type="button" id="btn-pwa-dismiss" class="btn-date" style="min-height:36px;">×</button>
+            </div>
+        </div>
         <header class="header">
             <div class="header-top">
                 <div class="logo" id="app-logo">WashTrack</div>
@@ -50,6 +60,10 @@
             <div class="summary-card expense"><div class="card-title">Giderler</div><div class="card-value" id="val-total-exp">₺0</div></div>
             <div class="summary-card remaining-cash"><div class="card-title">Kalan Nakit</div><div class="card-value" id="val-rem-cash">₺0</div></div>
         </section>
+        <div class="summary-actions">
+            <button type="button" class="btn-date" onclick="copyDaySummary()">📋 Gün Özetini Kopyala</button>
+            <span id="system-vehicle-count-label" class="summary-count-hint">Sistemde: <strong id="system-vehicle-count">0</strong> araç</span>
+        </div>
 
         <div class="main-content">
             <div class="forms-column">
@@ -97,6 +111,7 @@
                                 <input type="text" id="plate" list="plate-suggestions" placeholder="Örn: 34 ABC 123" required autocomplete="off" autocapitalize="characters" inputmode="text" style="text-transform: uppercase;">
                                 <datalist id="plate-suggestions"></datalist>
                                 <div id="duplicate-warning" style="display:none;color:var(--color-expense);font-size:12px;font-weight:600;margin-top:6px;">⚠️ Bu plaka bugün zaten kayıtlı!</div>
+                                <div id="turbo-loyalty" class="turbo-loyalty" style="display:none;"></div>
                                 <div id="recent-plates-wrap" class="recent-plates-wrap" style="display:none;">
                                     <div class="recent-plates-label">Son Plakalar</div>
                                     <div id="recent-plates" class="recent-plates"></div>
@@ -159,6 +174,13 @@
                         <button type="submit" class="btn-submit" id="btn-vehicle-submit">Aracı Kaydet</button>
                     </form>
                 </div>
+                <!-- Bulk Paste -->
+                <div class="glass-panel mt-4">
+                    <h2>📋 Toplu Yapıştır</h2>
+                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:10px;">Defter satırlarını yapıştır — her satır: plaka ve tutar (kart için satır sonuna k veya kk).</p>
+                    <textarea id="bulk-paste-text" class="bulk-paste-text" rows="5" placeholder="26 ADK 968 800&#10;26 BZ 555 1000 k&#10;24 DR 026 500"></textarea>
+                    <button type="button" class="btn-submit" onclick="scanBulkPaste()" style="margin-top:10px;background:linear-gradient(135deg,#0ea5e9,#2563eb);">Önizle ve Kaydet</button>
+                </div>
                 <!-- Add Expense -->
                 <div class="glass-panel mt-4">
                     <h2>Gider Ekle</h2>
@@ -194,6 +216,8 @@
                 <!-- Reconciliation -->
                 <div class="glass-panel mt-4 z-report-panel" id="z-report-box">
                     <h2>Gün Sonu (Kasa Sayımı)</h2>
+                    <p class="day-close-hint">Sistemde bugün <strong id="system-vehicle-count-2">0</strong> araç kayıtlı.</p>
+                    <div class="form-group"><label>Defterde kaç araç? <span style="font-weight:400;color:var(--text-muted);">(isteğe bağlı)</span></label><input type="number" id="defter-vehicle-count" placeholder="Örn: 11" min="0"></div>
                     <div class="form-group"><label>Çekmecedeki Nakit (₺)</label><input type="number" id="real-cash" placeholder="Kasada ne kadar nakit var?" min="0"></div>
                     <div class="form-group"><label>Z Raporu KK Toplamı (₺)</label><input type="number" id="real-cc" placeholder="POS gün sonu rakamı" min="0"></div>
                     <div style="display:flex; gap:10px; margin-top:10px;">
@@ -263,7 +287,7 @@
     <!-- Ledger OCR Import Modal -->
     <div id="ledger-import-modal" class="modal" style="display:none;">
         <div class="modal-content glass-panel" style="width:min(960px,96vw);max-height:90vh;overflow-y:auto;">
-            <h2>📋 Defter Okuma — Onayla</h2>
+            <h2 id="ledger-import-title">📋 Defter Okuma — Onayla</h2>
             <p id="ledger-import-hint" style="color:var(--text-muted);font-size:13px;margin-bottom:12px;">Okunan kayıtları kontrol et, yanlışları düzelt, sonra kaydet.</p>
             <div id="ledger-import-warn" style="display:none;color:var(--color-expense);font-size:13px;margin-bottom:10px;font-weight:600;"></div>
             <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
@@ -399,6 +423,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}?v=25"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=26"></script>
+    <script src="{{ url_for('static', filename='js/pwa-install.js') }}?v=1"></script>
 </body>
 </html>

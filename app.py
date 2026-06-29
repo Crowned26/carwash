@@ -800,7 +800,32 @@ def import_ledger_rows():
 
     conn.commit()
     conn.close()
-    return jsonify({'success': True, 'imported': imported, 'skipped': skipped, 'errors': errors})
+    return jsonify({'success': True, 'rows': rows, 'errors': errors})
+
+
+@app.route('/api/parse_bulk_paste', methods=['POST'])
+@login_required
+def parse_bulk_paste():
+    d = request.json or {}
+    text = (d.get('text') or '').strip()
+    branch = d.get('branch', 'Şube 1')
+    photo_date = d.get('photo_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+    if not text:
+        return jsonify({'error': 'Yapıştırılacak metin boş!'}), 400
+
+    rows = ledger_ocr.parse_ocr_text(text)
+    conn = get_db_connection()
+    ts, te = f'{photo_date} 00:00:00', f'{photo_date} 23:59:59'
+    existing = {
+        r['plate'] for r in conn.execute(
+            'SELECT DISTINCT plate FROM vehicles WHERE branch=? AND created_at>=? AND created_at<=?',
+            (branch, ts, te),
+        ).fetchall()
+    }
+    conn.close()
+    for row in rows:
+        row['already_today'] = row['plate'] in existing
+    return jsonify({'success': True, 'rows': rows})
 
 
 # ── Dashboard Data ──
@@ -1013,6 +1038,14 @@ def print_report():
         summary=summary,
         now=now_str,
         lang=lang,
+    )
+
+
+@app.route('/sw.js')
+def service_worker():
+    return send_file(
+        os.path.join(app.root_path, 'static', 'sw.js'),
+        mimetype='application/javascript',
     )
 
 
